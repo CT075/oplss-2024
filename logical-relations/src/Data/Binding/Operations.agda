@@ -35,6 +35,15 @@ zeroS = mkSupply (0 ᴮ) (0 ᴮ #∅)
 sucS : ∀{α} → (s : Supply α) → Supply (Supply.seedᴮ s ◃ α)
 sucS (mkSupply seedᴮ seed#) = mkSupply (sucᴮ seedᴮ) (suc# seed#)
 
+mutual
+  worldN : ℕ → World
+  worldN zero = ∅
+  worldN (suc n) = Supply.seedᴮ (supplyN n) ◃ worldN n
+
+  supplyN : ∀ n → Supply (worldN n)
+  supplyN zero = zeroS
+  supplyN (suc n) = sucS (supplyN n)
+
 record SubstEnv (Res : World → Set) (α : World) (β : World) : Set where
   constructor mk
   field
@@ -66,6 +75,9 @@ F ⊢>| G = ∀{i} → F i → G i
 Coerce : (World → Set) → Set
 Coerce F = ∀{α β} → α ⊆ β → F α → F β
 
+coerceKit : TrKit _⊆_ Name
+coerceKit = mk coerceᴺ (const id) ⊆-◃
+
 substKit : ∀{F : World → Set} → (Name ⊢>| F) → Coerce F → TrKit (SubstEnv F) F
 substKit {F} V coerceF = mk trName trBinder extEnv
   where
@@ -77,3 +89,7 @@ substKit {F} V coerceF = mk trName trBinder extEnv
       where
         trName' : Name (b ◃ α) → F (_ ◃ β)
         trName' = exportWith (V (nameᴮ seedᴮ)) (coerceF (⊆-# seed#β) ∘ trName)
+
+mapKit : ∀{Env} {F} {G} → (f : Name ⊢>| Name) (g : F ⊢>| G) → TrKit Env F → TrKit Env G
+mapKit f g kit = mk (λ Δ → g ∘ trName Δ ∘ f) trBinder extEnv
+  where open TrKit kit
