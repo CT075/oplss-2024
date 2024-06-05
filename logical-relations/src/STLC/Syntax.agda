@@ -2,12 +2,14 @@ open import Data.Binding
 
 module STLC.Syntax {{_ : NomPa}} where
 
-open import Data.Binding.Operations
+open import Data.Sum
 open import Effect.Functor
 open import Effect.Applicative renaming
   (module RawApplicative to Applicative; RawApplicative to Applicative)
 open import Effect.Applicative.Util
 open import Function hiding (_ˢ_)
+
+open import Data.Binding.Operations
 
 infix 19 _⇒_
 infix 20 if_then_else_
@@ -25,7 +27,7 @@ data Term (w : World) : Set where
   Pair : Term w → Term w → Term w
   prj₁ : Term w → Term w
   prj₂ : Term w → Term w
-  ƛ : Type → (b : Binder) → Term (b ◃ w) → Term w
+  ƛ : (b : Binder) → Type → Term (b ◃ w) → Term w
   _∙_ : Term w → Term w → Term w
 
 -- TODO: Pouillard can apparently generate this programmatically, which would
@@ -45,7 +47,7 @@ module TrTerm
   tr Δ (Pair e₁ e₂) = Pair <$> tr Δ e₁ <*> tr Δ e₂
   tr Δ (prj₁ e) = prj₁ <$> tr Δ e
   tr Δ (prj₂ e) = prj₂ <$> tr Δ e
-  tr Δ (ƛ τ b e) = ƛ τ _ <$> tr (extEnv b Δ) e
+  tr Δ (ƛ x τ e) = ƛ _ τ <$> tr (extEnv x Δ) e
   tr Δ (e₁ ∙ e₂) = _∙_ <$> tr Δ e₁ <*> tr Δ e₂
 
 open TrTerm
@@ -66,4 +68,10 @@ weaken∅ : Term ∅ → ∀{α} → Term α
 weaken∅ t = weaken ⊆-∅ t
 
 subst∅ : ∀{α} → (Name α → Term ∅) → Term α → Term ∅
-subst∅ = subst (supplyN 0)
+subst∅ = subst zeroS
+
+plug : ∀{α : World} {x : Binder} → Supply α → Term α → Term (x ◃ α) → Term α
+plug s t = subst s (exportWith t V)
+
+plug∅ : ∀{x : Binder} → Term ∅ → Term (x ◃ ∅) → Term ∅
+plug∅ = plug zeroS
