@@ -30,8 +30,11 @@ mutual
   --   ∀ e' → e ~>* e' → irred e → e' ∈V'⟦ τ ⟧
   -- and I didn't notice until I'd done all this development with this
   -- definition. However, this definition using exists is actually stronger
-  -- than the forall, provided a deterministic semantics (which we have). See
-  -- E-exists-forall below.
+  -- than the forall, provided a deterministic evaluation (which we have). See
+  -- E-exists-forall below. Notably, in a total language, we also have the
+  -- other direction, but we do not prove it here (because proving that this
+  -- STLC is total either requires a stronger logical relation or something else
+  -- quite complicated).
   _∈E'⟦_⟧ : Term ∅ → Type → Set
   e ∈E'⟦ τ ⟧ = ∃[ e' ](e ~>* e' × e' ∈V'⟦ τ ⟧)
 
