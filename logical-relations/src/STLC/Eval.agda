@@ -55,6 +55,28 @@ data _~>*_ : Term ∅ → Term ∅ → Set where
   kleene-z : ∀{e} → e ~>* e
   kleene-n : ∀{e e' e''} → e ~> e' → e' ~>* e'' → e ~>* e''
 
+kleene-append : ∀{e₁ e₂ e₃} → e₁ ~>* e₂ → e₂ ~>* e₃ → e₁ ~>* e₃
+kleene-append kleene-z e₂~>*e₃ = e₂~>*e₃
+kleene-append (kleene-n e₁~>e e~>*e₂) e₂~>*e₃ =
+  kleene-n e₁~>e (kleene-append e~>*e₂ e₂~>*e₃)
+
+iter-step : ∀{e₁ e₃ : Term ∅} {F : Term ∅ → Term ∅} →
+  (∀{e e'} → e ~> e' → F e ~> F e') →
+  e₁ ~>* e₃ → F e₁ ~>* F e₃
+iter-step f kleene-z = kleene-z
+iter-step f (kleene-n e₁~>e₂ e₂~>*e₃) = kleene-n (f e₁~>e₂) (iter-step f e₂~>*e₃)
+
+step-if* : ∀{e e' e₁ e₂} →
+  e ~>* e' →
+  if e then e₁ else e₂ ~>* if e' then e₁ else e₂
+step-if* = iter-step step-if
+
+step-prod₁* : ∀{e₁ e₁' e₂} → e₁ ~>* e₁' → Pair e₁ e₂ ~>* Pair e₁' e₂
+step-prod₁* = iter-step step-prod₁
+
+step-prod₂* : ∀{v₁ e₂ e₂'} → v₁ val → e₂ ~>* e₂' → Pair v₁ e₂ ~>* Pair v₁ e₂'
+step-prod₂* v₁-val = iter-step (step-prod₂ v₁-val)
+
 reduces : Term ∅ → Set
 reduces e = ∃[ e' ](e ~> e')
 
@@ -65,10 +87,8 @@ val-irred : ∀{e} → e val → irred e
 val-irred true-val ()
 val-irred false-val ()
 val-irred abs-val ()
-val-irred (prod-val e₁val e₂val) (Pair e₁' _ , step-prod₁ e₁~>e₁') =
-  val-irred e₁val (e₁' , e₁~>e₁')
-val-irred (prod-val e₁val e₂val) (Pair _ e₂' , step-prod₂ _ e₂~>e₂') =
-  val-irred e₂val (e₂' , e₂~>e₂')
+val-irred (prod-val e₁val e₂val) (_ , step-prod₁ e₁~>e₁') = val-irred e₁val (_ , e₁~>e₁')
+val-irred (prod-val e₁val e₂val) (_ , step-prod₂ _ e₂~>e₂') = val-irred e₂val (_ , e₂~>e₂')
 
 reduces-decidable : (e : Term ∅) → Dec (reduces e)
 reduces-decidable (V v) = no (λ ())

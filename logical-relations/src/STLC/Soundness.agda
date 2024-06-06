@@ -26,7 +26,9 @@ mutual
   _ ∈V'⟦ _ ⟧ = ⊥
 
   _∈E'⟦_⟧ : Term ∅ → Type → Set
-  e ∈E'⟦ τ ⟧ = ∃[ e' ](e ~>* e' × e' ∈V'⟦ τ ⟧)
+  -- Note: this was originally ∃e'.e ~>* e' × e'∈V'⟦τ⟧. Maybe prove that they
+  -- coincide for a deterministic semantics
+  e ∈E'⟦ τ ⟧ = ∀ e' → e ~>* e' → irred e' → e' ∈V'⟦ τ ⟧
 
 mutual
   data _∈V⟦_⟧ : Term ∅ → Type → Set where
@@ -39,9 +41,7 @@ mutual
     inductive
     constructor E-fold
     field
-      v : Term ∅
-      e~>*final-value : e ~>* v
-      v∈V⟦τ⟧ : v ∈V⟦ τ ⟧
+      defn-E⟦∙⟧ : ∀ e' → e ~>* e' → irred e' → e' ∈V⟦ τ ⟧
 
 mutual
   v-fold : ∀{e τ} → e ∈V'⟦ τ ⟧ → e ∈V⟦ τ ⟧
@@ -52,7 +52,10 @@ mutual
     v-abs (λ v v∈V' → e-fold (body-valid v v∈V'))
 
   e-fold : ∀{e τ} → e ∈E'⟦ τ ⟧ → e ∈E⟦ τ ⟧
-  e-fold (e' , e~>*e' , e'∈V') = E-fold e' e~>*e' (v-fold e'∈V')
+  e-fold {e} {τ} evals-in-V' = E-fold evals-in-V
+    where
+      evals-in-V : ∀ e' → e ~>* e' → irred e' → e' ∈V⟦ τ ⟧
+      evals-in-V e' e~>*e' irred-e' = v-fold (evals-in-V' e' e~>*e' irred-e')
 
 mutual
   v-unfold : ∀{e τ} → e ∈V⟦ τ ⟧ → e ∈V'⟦ τ ⟧
@@ -62,7 +65,10 @@ mutual
   v-unfold (v-abs body-valid) = refl , (λ v v∈V' → e-unfold (body-valid v v∈V'))
 
   e-unfold : ∀{e τ} → e ∈E⟦ τ ⟧ → e ∈E'⟦ τ ⟧
-  e-unfold (E-fold e' e~>*e' e'∈V) = e' , e~>*e' , v-unfold e'∈V
+  e-unfold {e} {τ} (E-fold evals-in-V) = evals-in-V'
+    where
+      evals-in-V' : ∀ e' → e ~>* e' → irred e' → e' ∈V'⟦ τ ⟧
+      evals-in-V' e' e~>*e' irred-e' = v-unfold (evals-in-V e' e~>*e' irred-e')
 
 V-val : ∀ {e τ} → e ∈V⟦ τ ⟧ → e val
 V-val v-bool-true = true-val
@@ -71,11 +77,15 @@ V-val (v-pair p₁ p₂) = prod-val (V-val p₁) (V-val p₂)
 V-val (v-abs _) = abs-val
 
 V⇒E : ∀ e {τ} → e ∈V⟦ τ ⟧ → e ∈E⟦ τ ⟧
-V⇒E e e∈V⟦τ⟧ = E-fold e kleene-z e∈V⟦τ⟧
+V⇒E e {τ} e∈V⟦τ⟧ = E-fold V-in-V
+  where
+    V-in-V : ∀ e' → e ~>* e' → irred e' → e' ∈V⟦ τ ⟧
+    V-in-V _ kleene-z _ = e∈V⟦τ⟧
+    V-in-V _ (kleene-n e~>e' _) _ = ⊥-elim (val-irred (V-val e∈V⟦τ⟧) (_ , e~>e'))
 
 record _∈G⟦_⟧ {w} (γ : Substs w) (Γ : Context w) : Set where
   field
-    apply-defn-G : ∀ x → γ(x) ∈V⟦ Γ(x) ⟧
+    defn-G⟦∙⟧ : ∀ x → γ(x) ∈V⟦ Γ(x) ⟧
 
 open _∈G⟦_⟧
 
@@ -84,13 +94,8 @@ infix 4 _⊨_∈_
 _⊨_∈_ : ∀ {w} → Context w → Term w → Type → Set
 Γ ⊨ e ∈ τ = ∀ γ → γ ∈G⟦ Γ ⟧ → subst∅ γ e ∈E⟦ τ ⟧
 
-apply-defn-⊨ : ∀{w Γ e τ} →
-  Γ ⊨ e ∈ τ →
-  (γ : Substs w) → γ ∈G⟦ Γ ⟧ → subst∅ γ e ∈E⟦ τ ⟧
-apply-defn-⊨ = id
-
-basic-thm : ∀{w} {Γ : Context w} {e τ} → Γ ⊢ e ∈ τ → Γ ⊨ e ∈ τ
-basic-thm {_} {Γ} {V x} {τ} (typ-var Γ[x]≡τ) γ γ∈G⟦Γ⟧ = V⇒E v v∈V⟦τ⟧
+fundamental-thm : ∀{w} {Γ : Context w} {e τ} → Γ ⊢ e ∈ τ → Γ ⊨ e ∈ τ
+fundamental-thm {_} {Γ} {V x} {τ} (typ-var Γ[x]≡τ) γ γ∈G⟦Γ⟧ = V⇒E v v∈V⟦τ⟧
   where
     v = γ(x)
 
@@ -99,23 +104,59 @@ basic-thm {_} {Γ} {V x} {τ} (typ-var Γ[x]≡τ) γ γ∈G⟦Γ⟧ = V⇒E v v
     rewrite-Γ[x]≡τ v t rewrite Γ[x]≡τ = t
 
     v∈V⟦τ⟧ : v ∈V⟦ τ ⟧
-    v∈V⟦τ⟧ = rewrite-Γ[x]≡τ v (apply-defn-G γ∈G⟦Γ⟧ x)
-basic-thm typ-true γ γ∈G⟦Γ⟧ = V⇒E True v-bool-true
-basic-thm typ-false γ γ∈G⟦Γ⟧ = V⇒E False v-bool-false
-basic-thm {_} {Γ} {if e then e₁ else e₂} {τ}
-  (typ-if Γ⊢e∈Bool Γ⊢e₁∈τ Γ⊢e₂∈τ) γ γ∈G⟦Γ⟧ = {! !}
+    v∈V⟦τ⟧ = rewrite-Γ[x]≡τ v (defn-G⟦∙⟧ γ∈G⟦Γ⟧ x)
+fundamental-thm typ-true γ γ∈G⟦Γ⟧ = V⇒E True v-bool-true
+fundamental-thm typ-false γ γ∈G⟦Γ⟧ = V⇒E False v-bool-false
+fundamental-thm {_} {_} {if e then e₁ else e₂} {τ}
+  (typ-if Γ⊢e∈Bool Γ⊢e₁∈τ Γ⊢e₂∈τ) γ γ∈G⟦Γ⟧ =
+    unwrap γ[e]∈E⟦Bool⟧
   where
-    Γ⊨e∈Bool : Γ ⊨ e ∈ TBool
-    Γ⊨e∈Bool = basic-thm Γ⊢e∈Bool
+    γ[e]∈E⟦Bool⟧ : subst∅ γ e ∈E⟦ TBool ⟧
+    γ[e]∈E⟦Bool⟧ = fundamental-thm Γ⊢e∈Bool γ γ∈G⟦Γ⟧
 
-    --e-final = .value apply-defn-⊨
-basic-thm (typ-prod Γ⊢e∈τ Γ⊢e∈τ₁) γ γ∈G⟦Γ⟧ = {! !}
-basic-thm (typ-prj₁ Γ⊢e∈τ) γ γ∈G⟦Γ⟧ = {! !}
-basic-thm (typ-prj₂ Γ⊢e∈τ) γ γ∈G⟦Γ⟧ = {! !}
-basic-thm (typ-abs Γ⊢e∈τ) γ γ∈G⟦Γ⟧ = {! !}
-basic-thm (typ-app Γ⊢e∈τ Γ⊢e∈τ₁) γ γ∈G⟦Γ⟧ = {! !}
+    γ[e₁]∈E⟦τ⟧ : subst∅ γ e₁ ∈E⟦ τ ⟧
+    γ[e₁]∈E⟦τ⟧ = fundamental-thm Γ⊢e₁∈τ γ γ∈G⟦Γ⟧
 
-push-subst-if : ∀ {w} (γ : Substs w) {e e₁ e₂} →
-  subst∅ γ (if e then e₁ else e₂) ≡
-  if subst∅ γ e then subst∅ γ e₁ else subst∅ γ e₂
-push-subst-if γ = refl
+    γ[e₂]∈E⟦τ⟧ : subst∅ γ e₂ ∈E⟦ τ ⟧
+    γ[e₂]∈E⟦τ⟧ = fundamental-thm Γ⊢e₂∈τ γ γ∈G⟦Γ⟧
+
+    unwrap : subst∅ γ e ∈E⟦ TBool ⟧ →
+      (if subst∅ γ e then subst∅ γ e₁ else subst∅ γ e₂) ∈E⟦ τ ⟧
+    unwrap (E-fold e-evals-in-V) = E-fold result-in-V
+      where
+        result-in-V : ∀ e' → _ ~>* e' → irred e' → e' ∈V⟦ τ ⟧
+        result-in-V _ kleene-z irred-me = {!!}
+        result-in-V e' (kleene-n e~> ~>*e') irred-e' = {! !}
+    {-
+      E-fold
+        (_∈E⟦_⟧.v γ[e₁]∈E⟦τ⟧)
+        (kleene-append
+          (step-if* e~>*True)
+          (kleene-n step-then (_∈E⟦_⟧.e~>*v γ[e₁]∈E⟦τ⟧)))
+        (_∈E⟦_⟧.v∈V⟦τ⟧ γ[e₁]∈E⟦τ⟧)
+    unwrap (E-fold False e~>*False _ v-bool-false) =
+      E-fold
+        (_∈E⟦_⟧.v γ[e₂]∈E⟦τ⟧)
+        (kleene-append
+          (step-if* e~>*False)
+          (kleene-n step-else (_∈E⟦_⟧.e~>*v γ[e₂]∈E⟦τ⟧)))
+        (_∈E⟦_⟧.v∈V⟦τ⟧ γ[e₂]∈E⟦τ⟧)
+    -}
+fundamental-thm {_} {_} {Pair e₁ e₂} {TProd τ₁ τ₂}
+  (typ-prod Γ⊢e₁∈τ₁ Γ⊢e₂∈τ₂) γ γ∈G⟦Γ⟧ =
+    {!
+    E-fold
+      (Pair (_∈E⟦_⟧.v γ[e₁]∈E⟦τ₁⟧) (_∈E⟦_⟧.v γ[e₂]∈E⟦τ₂⟧))
+      {!!}
+      {!!}
+    !}
+  where
+    γ[e₁]∈E⟦τ₁⟧ : subst∅ γ e₁ ∈E⟦ τ₁ ⟧
+    γ[e₁]∈E⟦τ₁⟧ = fundamental-thm Γ⊢e₁∈τ₁ γ γ∈G⟦Γ⟧
+
+    γ[e₂]∈E⟦τ₂⟧ : subst∅ γ e₂ ∈E⟦ τ₂ ⟧
+    γ[e₂]∈E⟦τ₂⟧ = fundamental-thm Γ⊢e₂∈τ₂ γ γ∈G⟦Γ⟧
+fundamental-thm (typ-prj₁ Γ⊢e∈τ) γ γ∈G⟦Γ⟧ = {! !}
+fundamental-thm (typ-prj₂ Γ⊢e∈τ) γ γ∈G⟦Γ⟧ = {! !}
+fundamental-thm (typ-abs Γ⊢e∈τ) γ γ∈G⟦Γ⟧ = {! !}
+fundamental-thm (typ-app Γ⊢e∈τ Γ⊢e∈τ₁) γ γ∈G⟦Γ⟧ = {! !}
