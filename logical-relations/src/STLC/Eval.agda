@@ -2,6 +2,7 @@ open import Data.Binding
 
 module STLC.Eval {{_ : NomPa}} where
 
+open import Data.Empty
 open import Data.Product
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary using (¬_; Dec; yes; no)
@@ -54,6 +55,9 @@ infix 4 _~>*_
 data _~>*_ : Term ∅ → Term ∅ → Set where
   kleene-z : ∀{e} → e ~>* e
   kleene-n : ∀{e e' e''} → e ~> e' → e' ~>* e'' → e ~>* e''
+
+kleene-singleton : ∀{e e'} → e ~> e' → e ~>* e'
+kleene-singleton e~>e' = kleene-n e~>e' kleene-z
 
 kleene-append : ∀{e₁ e₂ e₃} → e₁ ~>* e₂ → e₂ ~>* e₃ → e₁ ~>* e₃
 kleene-append kleene-z e₂~>*e₃ = e₂~>*e₃
@@ -176,3 +180,55 @@ reduces-decidable (e₁ ∙ e₂) with reduces-decidable e₁
             { (e₁ ∙ e₂' , step-app₂ e₂~>) → ¬e₂~> (e₂' , e₂~>)
             ; (e[e₂/x] , step-app _ e₂val) → ¬e₂val (e₂val)
             })
+
+~>-deterministic : ∀ {e e₁ e₂} → e ~> e₁ → e ~> e₂ → e₁ ≡ e₂
+~>-deterministic (step-if e~>e₁) (step-if e~>e₂)
+  rewrite ~>-deterministic e~>e₁ e~>e₂ = refl
+~>-deterministic step-then step-then = refl
+~>-deterministic step-else step-else = refl
+~>-deterministic (step-prod₁ a~>a₁) (step-prod₁ a~>a₂)
+  rewrite ~>-deterministic a~>a₁ a~>a₂ = refl
+~>-deterministic (step-prod₁ a~>a₁) (step-prod₂ a-val b~>b₂) =
+  ⊥-elim (val-irred a-val (_ , a~>a₁))
+~>-deterministic (step-prod₂ a-val b~>b₁) (step-prod₁ a~>a₂) =
+  ⊥-elim (val-irred a-val (_ , a~>a₂))
+~>-deterministic (step-prod₂ _ b~>b₁) (step-prod₂ _ b~>b₂)
+  rewrite ~>-deterministic b~>b₁ b~>b₂ = refl
+~>-deterministic (step-prj₁-mid e~>e₁) (step-prj₁-mid e~>e₂)
+  rewrite ~>-deterministic e~>e₁ e~>e₂ = refl
+~>-deterministic (step-prj₁-mid e~>e₁) (step-prj₁-app e-val) =
+  ⊥-elim (val-irred e-val (_ , e~>e₁))
+~>-deterministic (step-prj₁-app e-val) (step-prj₁-mid e~>e₂) =
+  ⊥-elim (val-irred e-val (_ , e~>e₂))
+~>-deterministic (step-prj₁-app _) (step-prj₁-app _) = refl
+~>-deterministic (step-prj₂-mid e~>e₁) (step-prj₂-mid e~>e₂)
+  rewrite ~>-deterministic e~>e₁ e~>e₂ = refl
+~>-deterministic (step-prj₂-mid e~>e₁) (step-prj₂-app e-val) =
+  ⊥-elim (val-irred e-val (_ , e~>e₁))
+~>-deterministic (step-prj₂-app e-val) (step-prj₂-mid e~>e₂) =
+  ⊥-elim (val-irred e-val (_ , e~>e₂))
+~>-deterministic (step-prj₂-app _) (step-prj₂-app _) = refl
+~>-deterministic (step-app₁ e~>e₁) (step-app₁ e~>e₂)
+  rewrite ~>-deterministic e~>e₁ e~>e₂ = refl
+~>-deterministic (step-app₂ e~>e₁) (step-app₂ e~>e₂)
+  rewrite ~>-deterministic e~>e₁ e~>e₂ = refl
+~>-deterministic (step-app₂ e~>e₁) (step-app _ e-val) =
+  ⊥-elim (val-irred e-val (_ , e~>e₁))
+~>-deterministic (step-app _ e-val) (step-app₂ e~>e₂) =
+  ⊥-elim (val-irred e-val (_ , e~>e₂))
+~>-deterministic (step-app e₁≡e[v/x] _) (step-app e₂≡e[v/x] _)
+  rewrite e₁≡e[v/x] rewrite e₂≡e[v/x] = refl
+
+norm-deterministic : ∀ {e v₁ v₂} →
+  e ~>* v₁ → e ~>* v₂ → irred v₁ → irred v₂ →
+  v₁ ≡ v₂
+norm-deterministic kleene-z kleene-z _ _ = refl
+norm-deterministic kleene-z (kleene-n e~>e' _) e-irred _ =
+  ⊥-elim (e-irred (_ , e~>e'))
+norm-deterministic (kleene-n e~>e' _) kleene-z _ e-irred =
+  ⊥-elim (e-irred (_ , e~>e'))
+norm-deterministic
+    (kleene-n e~>e₁ e₁~>*v₁) (kleene-n e~>e₂ e₂~>*v₂)
+    v₁-irred v₂-irred
+    rewrite ~>-deterministic e~>e₁ e~>e₂ =
+  norm-deterministic e₁~>*v₁ e₂~>*v₂ v₁-irred v₂-irred
