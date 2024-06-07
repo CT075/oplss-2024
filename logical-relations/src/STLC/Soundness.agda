@@ -183,15 +183,15 @@ fundamental-thm {_} {_} {prj₂ e} (typ-prj₂ {_} {τ₁} {τ₂} Γ⊢e∈τ) 
         v₂
         (kleene-snoc (step-prj₂* e~>*vs) (step-prj₂-app (V-val vs∈V)))
         v₂∈V⟦τ₂⟧
-fundamental-thm {_} {_} {ƛxe} (typ-abs {x} {τ} {τ'} {e} Γ,x~τ⊢e∈τ') γ γ∈G⟦Γ⟧ =
+fundamental-thm {_} {_} {ƛxe@(ƛ x τ e)} (typ-abs {_} {_} {τ'} Γ,x~τ⊢e∈τ') γ γ∈G⟦Γ⟧ =
   E-fold (subst∅ γ ƛxe) kleene-z γ[ƛxe]∈V⟦τ⇒τ'⟧
   where
+    γ[ƛxe] : Term ∅
+    γ[ƛxe] = subst∅ γ (ƛ x τ e)
+
     γ[ƛxe]∈V⟦τ⇒τ'⟧ : subst∅ γ ƛxe ∈V⟦ τ ⇒ τ' ⟧
     γ[ƛxe]∈V⟦τ⇒τ'⟧ = v-abs {!!}
-
-    body-holds : ∀ v → v ∈V'⟦ τ ⟧ → plug∅ v (TrTerm.tr id-app (substKit V weaken) (TrKit.extEnv (substKit V weaken) x (mk γ zeroS)) e) ∈E⟦ τ' ⟧
-    body-holds v v∈V'⟦τ⟧ = {!!}
-fundamental-thm (typ-app Γ⊢e∈τ Γ⊢e∈τ₁) γ γ∈G⟦Γ⟧ = {! !}
+fundamental-thm (typ-app a b) γ γ∈G⟦Γ⟧ = {!!}
 
 E-exists-forall : ∀ {e τ} →
   (e ∈E'⟦ τ ⟧) →
