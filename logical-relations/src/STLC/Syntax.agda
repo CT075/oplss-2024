@@ -46,7 +46,7 @@ module TrTerm
   tr Δ (Pair e₁ e₂) = Pair <$> tr Δ e₁ <*> tr Δ e₂
   tr Δ (prj₁ e) = prj₁ <$> tr Δ e
   tr Δ (prj₂ e) = prj₂ <$> tr Δ e
-  tr Δ (ƛ x τ e) = ƛ _ τ <$> tr (extEnv x Δ) e
+  tr Δ (ƛ x τ e) = ƛ _ τ <$> tr (extEnv _ Δ) e
   tr Δ (e₁ ∙ e₂) = _∙_ <$> tr Δ e₁ <*> tr Δ e₂
 
 open TrTerm
