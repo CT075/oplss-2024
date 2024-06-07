@@ -54,21 +54,24 @@ infix 4 _~>*_
 
 data _~>*_ : Term ∅ → Term ∅ → Set where
   kleene-z : ∀{e} → e ~>* e
-  kleene-n : ∀{e e' e''} → e ~> e' → e' ~>* e'' → e ~>* e''
+  kleene-cons : ∀{e e' e''} → e ~> e' → e' ~>* e'' → e ~>* e''
 
 kleene-singleton : ∀{e e'} → e ~> e' → e ~>* e'
-kleene-singleton e~>e' = kleene-n e~>e' kleene-z
+kleene-singleton e~>e' = kleene-cons e~>e' kleene-z
 
 kleene-append : ∀{e₁ e₂ e₃} → e₁ ~>* e₂ → e₂ ~>* e₃ → e₁ ~>* e₃
 kleene-append kleene-z e₂~>*e₃ = e₂~>*e₃
-kleene-append (kleene-n e₁~>e e~>*e₂) e₂~>*e₃ =
-  kleene-n e₁~>e (kleene-append e~>*e₂ e₂~>*e₃)
+kleene-append (kleene-cons e₁~>e e~>*e₂) e₂~>*e₃ =
+  kleene-cons e₁~>e (kleene-append e~>*e₂ e₂~>*e₃)
+
+kleene-snoc : ∀{e₁ e₂ e₃} → e₁ ~>* e₂ → e₂ ~> e₃ → e₁ ~>* e₃
+kleene-snoc e₁~>*e₂ e₂~>e₃ = kleene-append e₁~>*e₂ (kleene-singleton e₂~>e₃)
 
 iter-step : ∀{e₁ e₃ : Term ∅} {F : Term ∅ → Term ∅} →
   (∀{e e'} → e ~> e' → F e ~> F e') →
   e₁ ~>* e₃ → F e₁ ~>* F e₃
 iter-step f kleene-z = kleene-z
-iter-step f (kleene-n e₁~>e₂ e₂~>*e₃) = kleene-n (f e₁~>e₂) (iter-step f e₂~>*e₃)
+iter-step f (kleene-cons e₁~>e₂ e₂~>*e₃) = kleene-cons (f e₁~>e₂) (iter-step f e₂~>*e₃)
 
 step-if* : ∀{e e' e₁ e₂} →
   e ~>* e' →
@@ -80,6 +83,12 @@ step-prod₁* = iter-step step-prod₁
 
 step-prod₂* : ∀{v₁ e₂ e₂'} → v₁ val → e₂ ~>* e₂' → Pair v₁ e₂ ~>* Pair v₁ e₂'
 step-prod₂* v₁-val = iter-step (step-prod₂ v₁-val)
+
+step-prj₁* : ∀{e e'} → e ~>* e' → prj₁ e ~>* prj₁ e'
+step-prj₁* = iter-step step-prj₁-mid
+
+step-prj₂* : ∀{e e'} → e ~>* e' → prj₂ e ~>* prj₂ e'
+step-prj₂* = iter-step step-prj₂-mid
 
 reduces : Term ∅ → Set
 reduces e = ∃[ e' ](e ~> e')
@@ -223,12 +232,12 @@ norm-deterministic : ∀ {e v₁ v₂} →
   e ~>* v₁ → e ~>* v₂ → irred v₁ → irred v₂ →
   v₁ ≡ v₂
 norm-deterministic kleene-z kleene-z _ _ = refl
-norm-deterministic kleene-z (kleene-n e~>e' _) e-irred _ =
+norm-deterministic kleene-z (kleene-cons e~>e' _) e-irred _ =
   ⊥-elim (e-irred (_ , e~>e'))
-norm-deterministic (kleene-n e~>e' _) kleene-z _ e-irred =
+norm-deterministic (kleene-cons e~>e' _) kleene-z _ e-irred =
   ⊥-elim (e-irred (_ , e~>e'))
 norm-deterministic
-    (kleene-n e~>e₁ e₁~>*v₁) (kleene-n e~>e₂ e₂~>*v₂)
+    (kleene-cons e~>e₁ e₁~>*v₁) (kleene-cons e~>e₂ e₂~>*v₂)
     v₁-irred v₂-irred
     rewrite ~>-deterministic e~>e₁ e~>e₂ =
   norm-deterministic e₁~>*v₁ e₂~>*v₂ v₁-irred v₂-irred

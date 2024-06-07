@@ -63,8 +63,7 @@ renameKit = mk trName trBinder extEnv
   where
     open SubstEnv
     extEnv : ∀{α β} b (Δ : RenameEnv α β) → RenameEnv (b ◃ α) (_ ◃ β)
-    extEnv {α} {β} b (mk trName (mkSupply seedᴮ seed#β)) =
-        mk trName' (sucS (mkSupply seedᴮ seed#β))
+    extEnv {α} {β} b (mk trName s@(mkSupply seedᴮ seed#β)) = mk trName' (sucS s)
       where
         trName' : Name (b ◃ α) → Name (_ ◃ β)
         trName' = exportWith (nameᴮ seedᴮ) (coerceᴺ (⊆-# seed#β) ∘ trName)
@@ -84,8 +83,7 @@ substKit {F} V coerceF = mk trName trBinder extEnv
     open SubstEnv
 
     extEnv : ∀ {α β} b (∆ : SubstEnv F α β) → SubstEnv F (b ◃ α) (_ ◃ β)
-    extEnv {α} {β} b (mk trName (mkSupply seedᴮ seed#β)) =
-        mk trName' (sucS (mkSupply seedᴮ seed#β))
+    extEnv {α} {β} b (mk trName s@(mkSupply seedᴮ seed#β)) = mk trName' (sucS s)
       where
         trName' : Name (b ◃ α) → F (_ ◃ β)
         trName' = exportWith (V (nameᴮ seedᴮ)) (coerceF (⊆-# seed#β) ∘ trName)

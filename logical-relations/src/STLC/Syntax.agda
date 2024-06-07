@@ -2,7 +2,6 @@ open import Data.Binding
 
 module STLC.Syntax {{_ : NomPa}} where
 
-open import Data.Sum
 open import Effect.Functor
 open import Effect.Applicative renaming
   (module RawApplicative to Applicative; RawApplicative to Applicative)

@@ -9,7 +9,9 @@ open import Data.Unit
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary using (yes; no)
 open import Function
+open import Effect.Applicative.Util
 
+open import Data.Binding.Operations
 open import Data.Binding.Context
 
 open import STLC.Syntax
@@ -127,14 +129,14 @@ fundamental-thm {_} {_} {if e then e₁ else e₂} {τ}
         (_∈E⟦_⟧.v γ[e₁]∈E⟦τ⟧)
         (kleene-append
           (step-if* e~>*True)
-          (kleene-n step-then (_∈E⟦_⟧.e~>*v γ[e₁]∈E⟦τ⟧)))
+          (kleene-cons step-then (_∈E⟦_⟧.e~>*v γ[e₁]∈E⟦τ⟧)))
         (_∈E⟦_⟧.v∈V⟦τ⟧ γ[e₁]∈E⟦τ⟧)
     unwrap (E-fold False e~>*False v-bool-false) =
       E-fold
         (_∈E⟦_⟧.v γ[e₂]∈E⟦τ⟧)
         (kleene-append
           (step-if* e~>*False)
-          (kleene-n step-else (_∈E⟦_⟧.e~>*v γ[e₂]∈E⟦τ⟧)))
+          (kleene-cons step-else (_∈E⟦_⟧.e~>*v γ[e₂]∈E⟦τ⟧)))
         (_∈E⟦_⟧.v∈V⟦τ⟧ γ[e₂]∈E⟦τ⟧)
 fundamental-thm {_} {_} {Pair e₁ e₂} {TProd τ₁ τ₂}
     (typ-prod Γ⊢e₁∈τ₁ Γ⊢e₂∈τ₂) γ γ∈G⟦Γ⟧ =
@@ -157,9 +159,38 @@ fundamental-thm {_} {_} {Pair e₁ e₂} {TProd τ₁ τ₂}
           (step-prod₁* e₁~>*v₁)
           (step-prod₂* (V-val v₁∈V⟦τ₁⟧) e₂~>*v₂))
         (v-pair v₁∈V⟦τ₁⟧ v₂∈V⟦τ₂⟧)
-fundamental-thm (typ-prj₁ Γ⊢e∈τ) γ γ∈G⟦Γ⟧ = {! !}
-fundamental-thm (typ-prj₂ Γ⊢e∈τ) γ γ∈G⟦Γ⟧ = {! !}
-fundamental-thm (typ-abs Γ⊢e∈τ) γ γ∈G⟦Γ⟧ = {! !}
+fundamental-thm {_} {_} {prj₁ e} (typ-prj₁ {_} {τ₁} {τ₂} Γ⊢e∈τ) γ γ∈G⟦Γ⟧ =
+    unwrap γ[e]∈E⟦τ⟧
+  where
+    γ[e]∈E⟦τ⟧ : subst∅ γ e ∈E⟦ TProd τ₁ τ₂ ⟧
+    γ[e]∈E⟦τ⟧ = fundamental-thm Γ⊢e∈τ γ γ∈G⟦Γ⟧
+
+    unwrap : subst∅ γ e ∈E⟦ TProd τ₁ τ₂ ⟧ → prj₁ (subst∅ γ e) ∈E⟦ τ₁ ⟧
+    unwrap (E-fold (Pair v₁ v₂) e~>*vs (vs∈V@(v-pair v₁∈V⟦τ₁⟧ v₂∈V⟦τ₂⟧))) =
+      E-fold
+        v₁
+        (kleene-snoc (step-prj₁* e~>*vs) (step-prj₁-app (V-val vs∈V)))
+        v₁∈V⟦τ₁⟧
+fundamental-thm {_} {_} {prj₂ e} (typ-prj₂ {_} {τ₁} {τ₂} Γ⊢e∈τ) γ γ∈G⟦Γ⟧ =
+    unwrap γ[e]∈E⟦τ⟧
+  where
+    γ[e]∈E⟦τ⟧ : subst∅ γ e ∈E⟦ TProd τ₁ τ₂ ⟧
+    γ[e]∈E⟦τ⟧ = fundamental-thm Γ⊢e∈τ γ γ∈G⟦Γ⟧
+
+    unwrap : subst∅ γ e ∈E⟦ TProd τ₁ τ₂ ⟧ → prj₂ (subst∅ γ e) ∈E⟦ τ₂ ⟧
+    unwrap (E-fold (Pair v₁ v₂) e~>*vs (vs∈V@(v-pair v₁∈V⟦τ₁⟧ v₂∈V⟦τ₂⟧))) =
+      E-fold
+        v₂
+        (kleene-snoc (step-prj₂* e~>*vs) (step-prj₂-app (V-val vs∈V)))
+        v₂∈V⟦τ₂⟧
+fundamental-thm {_} {_} {ƛxe} (typ-abs {x} {τ} {τ'} {e} Γ,x~τ⊢e∈τ') γ γ∈G⟦Γ⟧ =
+  E-fold (subst∅ γ ƛxe) kleene-z γ[ƛxe]∈V⟦τ⇒τ'⟧
+  where
+    γ[ƛxe]∈V⟦τ⇒τ'⟧ : subst∅ γ ƛxe ∈V⟦ τ ⇒ τ' ⟧
+    γ[ƛxe]∈V⟦τ⇒τ'⟧ = v-abs {!!}
+
+    body-holds : ∀ v → v ∈V'⟦ τ ⟧ → plug∅ v (TrTerm.tr id-app (substKit V weaken) (TrKit.extEnv (substKit V weaken) x (mk γ zeroS)) e) ∈E⟦ τ' ⟧
+    body-holds v v∈V'⟦τ⟧ = {!!}
 fundamental-thm (typ-app Γ⊢e∈τ Γ⊢e∈τ₁) γ γ∈G⟦Γ⟧ = {! !}
 
 E-exists-forall : ∀ {e τ} →
