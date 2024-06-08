@@ -1,0 +1,2 @@
+nompa caught a real bug in substitution setup
+
