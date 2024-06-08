@@ -1,17 +1,24 @@
-open import Data.Binding
+module STLC.Syntax where
 
-module STLC.Syntax {{_ : NomPa}} where
-
-open import Effect.Functor
-open import Effect.Applicative renaming
-  (module RawApplicative to Applicative; RawApplicative to Applicative)
-open import Effect.Applicative.Util
-open import Function hiding (_ˢ_)
-
-open import Data.Binding.Operations
+open import Data.String
+open import Data.List
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 
 infix 19 _⇒_
 infix 20 if_then_else_
+
+World = List String
+
+record Name (w : World) : Set where
+  constructor mkName
+  field
+    name : String
+    -- In fact, a value of type `name ∈ w` is equivalent to a member of
+    -- `Fin (length w)` (this proof is the index of the given name in the list).
+    -- So another way to view this technique is that we are annotating a
+    -- standard De Bruijin index with a string name!
+    name∈w : name ∈ w
 
 data Type : Set where
   TBool : Type
@@ -26,60 +33,29 @@ data Term (w : World) : Set where
   Pair : Term w → Term w → Term w
   prj₁ : Term w → Term w
   prj₂ : Term w → Term w
-  ƛ : (b : Binder) → Type → Term (b ◃ w) → Term w
+  ƛ : (x : String) → Type → Term (x ∷ w) → Term w
   _∙_ : Term w → Term w → Term w
 
--- TODO: Pouillard can apparently generate this programmatically, which would
--- be a neat exercise for later
+weaken : ∀{w} → (x : String) → Term w → Term (x ∷ w)
+weaken _ (V (mkName n rest)) = V (mkName n (there rest))
+weaken _ True = True
+weaken _ False = False
+weaken x (if e then e₁ else e₂) = if weaken x e then weaken x e₁ else weaken x e₂
+weaken x (Pair e₁ e₂) = Pair (weaken x e₁) (weaken x e₂)
+weaken x (prj₁ e) = prj₁ (weaken x e)
+weaken x (prj₂ e) = prj₂ (weaken x e)
+-- We need to pass some extra state parameter to know how many binders we're
+-- underneath, but List.Membership is not good for this.
+weaken x (ƛ x' τ e) = ƛ x' τ (weaken x e)
+weaken x (e₁ ∙ e₂) = weaken x e₁ ∙ weaken x e₂
 
-module TrTerm
-    {E : Set → Set} (E-app : Applicative E)
-    {Env : World → World → Set} (trKit : TrKit Env (E ∘ Term)) where
-  open Applicative E-app
-  open TrKit trKit
-
-  tr : ∀{α β} → Env α β → Term α → E (Term β)
-  tr Δ (V x) = trName Δ x
-  tr Δ True = pure True
-  tr Δ False = pure False
-  tr Δ (if e then e₁ else e₂) = if_then_else_ <$> tr Δ e <*> tr Δ e₁ <*> tr Δ e₂
-  tr Δ (Pair e₁ e₂) = Pair <$> tr Δ e₁ <*> tr Δ e₂
-  tr Δ (prj₁ e) = prj₁ <$> tr Δ e
-  tr Δ (prj₂ e) = prj₂ <$> tr Δ e
-  tr Δ (ƛ x τ e) = ƛ _ τ <$> tr (extEnv _ Δ) e
-  tr Δ (e₁ ∙ e₂) = _∙_ <$> tr Δ e₁ <*> tr Δ e₂
-
-open TrTerm
-
-tr' : ∀ {E : Set → Set} (E-app : Applicative E)
-        {Env : World → World → Set} (trKit : TrKit Env (E ∘ Name))
-        {α β} → Env α β → Term α → E (Term β)
-tr' E-app trKit = tr E-app (mapKit id (E-app <$> V) trKit)
-  where open Applicative
-
-weaken : ∀{α β} → α ⊆ β → Term α → Term β
-weaken = tr' id-app coerceKit
-
-subst : ∀{α β} → Supply β → (Name α → Term β) → Term α → Term β
-subst s f = tr id-app (substKit V weaken) (mk f s)
-
-weaken∅ : Term ∅ → ∀{α} → Term α
-weaken∅ t = weaken ⊆-∅ t
-
-subst∅ : ∀{α} → (Name α → Term ∅) → Term α → Term ∅
-subst∅ = subst zeroS
-
-plug : ∀{α : World} {x : Binder} → Supply α → Term α → Term (x ◃ α) → Term α
-plug s t = subst s (exportWith t V)
-
-plug∅ : ∀{x : Binder} → Term ∅ → Term (x ◃ ∅) → Term ∅
-plug∅ = plug zeroS
-
-subst∅Under : ∀{α : World} →
-  (x : Binder) → (Name α → Term ∅) → Term (x ◃ α) → Term (zeroᴮ ◃ ∅)
-subst∅Under x γ e =
-  TrTerm.tr id-app (substKit V weaken)
-    (TrKit.extEnv (substKit V weaken) x (mk γ (mkSupply b (b #∅))))
-    e
-  where
-    b = zeroᴮ
+subst : ∀{w w'} → (Name w → Term w') → Term w → Term w'
+subst f (V x) = f x
+subst f True = True
+subst f False = False
+subst f (if e then e₁ else e₂) = if subst f e then subst f e₁ else subst f e₂
+subst f (Pair e₁ e₂) = Pair (subst f e₁) (subst f e₂)
+subst f (prj₁ e) = prj₁ (subst f e)
+subst f (prj₂ e) = prj₂ (subst f e)
+subst f (ƛ x τ e) = {! !}
+subst f (e₁ ∙ e₂) = (subst f e₁ ∙ subst f e₂)
