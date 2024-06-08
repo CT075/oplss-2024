@@ -35,6 +35,8 @@ subst-ext x γ t (Pair e₁ e₂)
 subst-ext x γ t (prj₁ e) rewrite subst-ext x γ t e = refl
 subst-ext x γ t (prj₂ e) rewrite subst-ext x γ t e = refl
 subst-ext x γ t (ƛ x' τ e) = {!!}
+  where
+    foo = subst∅Under x' (γ & x ~ t) e
 subst-ext x γ t (e₁ ∙ e₂)
   rewrite subst-ext x γ t e₁
   rewrite subst-ext x γ t e₂ = refl
