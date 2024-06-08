@@ -22,7 +22,14 @@ Substs = Ctx (Term ∅)
 
 subst-ext : ∀ {w : World} x (γ : Substs w) t e →
   plug∅ t (subst∅Under x γ e) ≡ subst∅ (γ & x ~ t) e
-subst-ext x γ t (V x') = {! !}
+subst-ext x γ t (V x') =
+  -- This case is actually wrong in the case that x = x'. Specifically, if
+  -- γ already contains a binding [x ⊢> t'] for x, then
+  --   γ(x)[x/t] = t'[x/t] = t'
+  -- but
+  --   (γ[x ⊢> t])(x) = t
+  -- (because the outermost binding applies first).
+  {! !}
 subst-ext x γ t True = refl
 subst-ext x γ t False = refl
 subst-ext x γ t (if e then e₁ else e₂)
