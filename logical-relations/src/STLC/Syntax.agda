@@ -74,3 +74,12 @@ plug s t = subst s (exportWith t V)
 
 plug∅ : ∀{x : Binder} → Term ∅ → Term (x ◃ ∅) → Term ∅
 plug∅ = plug zeroS
+
+subst∅Under : ∀{α : World} →
+  (x : Binder) → (Name α → Term ∅) → Term (x ◃ α) → Term (zeroᴮ ◃ ∅)
+subst∅Under x γ e =
+  TrTerm.tr id-app (substKit V weaken)
+    (TrKit.extEnv (substKit V weaken) x (mk γ (mkSupply b (b #∅))))
+    e
+  where
+    b = zeroᴮ

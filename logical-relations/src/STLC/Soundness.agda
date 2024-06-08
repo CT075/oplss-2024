@@ -6,7 +6,7 @@ open import Data.List using ([]; _∷_)
 open import Data.Product
 open import Data.Empty
 open import Data.Unit
-open import Relation.Binary.PropositionalEquality
+open import Relation.Binary.PropositionalEquality hiding (subst)
 open import Relation.Nullary using (yes; no)
 open import Function
 open import Effect.Applicative.Util
@@ -19,6 +19,25 @@ open import STLC.Typing
 open import STLC.Eval
 
 Substs = Ctx (Term ∅)
+
+subst-ext : ∀ {w : World} x (γ : Substs w) t e →
+  plug∅ t (subst∅Under x γ e) ≡ subst∅ (γ & x ~ t) e
+subst-ext x γ t (V x') = {! !}
+subst-ext x γ t True = refl
+subst-ext x γ t False = refl
+subst-ext x γ t (if e then e₁ else e₂)
+  rewrite subst-ext x γ t e
+  rewrite subst-ext x γ t e₁
+  rewrite subst-ext x γ t e₂ = refl
+subst-ext x γ t (Pair e₁ e₂)
+  rewrite subst-ext x γ t e₁
+  rewrite subst-ext x γ t e₂ = refl
+subst-ext x γ t (prj₁ e) rewrite subst-ext x γ t e = refl
+subst-ext x γ t (prj₂ e) rewrite subst-ext x γ t e = refl
+subst-ext x γ t (ƛ x' τ e) = {!!}
+subst-ext x γ t (e₁ ∙ e₂)
+  rewrite subst-ext x γ t e₁
+  rewrite subst-ext x γ t e₂ = refl
 
 mutual
   _∈V'⟦_⟧ : Term ∅ → Type → Set
@@ -188,6 +207,12 @@ fundamental-thm {_} {_} {ƛxe@(ƛ x τ e)} (typ-abs {_} {_} {τ'} Γ,x~τ⊢e∈
   where
     γ[ƛxe] : Term ∅
     γ[ƛxe] = subst∅ γ (ƛ x τ e)
+
+    γ[e] : Term (zeroᴮ ◃ ∅)
+    γ[e] = subst∅Under x γ e
+
+    body-valid : ∀ v → v ∈V'⟦ τ ⟧ → plug∅ v γ[e] ∈E⟦ τ' ⟧
+    body-valid v v∈V'⟦τ⟧ = E-fold {!!} {!!} {!!}
 
     γ[ƛxe]∈V⟦τ⇒τ'⟧ : subst∅ γ ƛxe ∈V⟦ τ ⇒ τ' ⟧
     γ[ƛxe]∈V⟦τ⇒τ'⟧ = v-abs {!!}
