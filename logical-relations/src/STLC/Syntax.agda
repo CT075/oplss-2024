@@ -31,14 +31,22 @@ data Term (n : ℕ) : Set where
 Context : Set → ℕ → Set
 Context T n = Fin n → T
 
-infix 4 _&~_
+infix 4 _~&_
+infix 4 _~∘_
 
 nil : ∀{T} → Context T zero
 nil ()
 
-_&~_ : ∀{T n} → Context T n → T → Context T (suc n)
-_&~_ Γ c zero = c
-_&~_ Γ c (suc n) = Γ(n)
+_~&_ : ∀{T n} → T → Context T n → Context T (suc n)
+_~&_ c Γ zero = c
+_~&_ c Γ (suc n) = Γ(n)
+
+drop : ∀{T n} → Context T (suc n) → Context T n
+drop γ = γ ∘ suc
+
+_~∘_ : ∀{T a b} → Context T a → Context T b → Context T (a + b)
+_~∘_ {_} {zero} γ₁ γ₂ = γ₂
+_~∘_ {_} {suc n} γ₁ γ₂ = γ₁(zero) ~& (drop(γ₁) ~∘ γ₂)
 
 weakenUnder : ∀{n} → Fin (suc n) → Term n → Term (suc n)
 weakenUnder i (V x) with i ≤? x
@@ -46,7 +54,8 @@ weakenUnder i (V x) with i ≤? x
 ... | false because _ = V (inject₁ x)
 weakenUnder i True = True
 weakenUnder i False = False
-weakenUnder i (if e then e₁ else e₂) = if weakenUnder i e then weakenUnder i e₁ else weakenUnder i e₂
+weakenUnder i (if e then e₁ else e₂) =
+  if weakenUnder i e then weakenUnder i e₁ else weakenUnder i e₂
 weakenUnder i (Pair e₁ e₂) = Pair (weakenUnder i e₁) (weakenUnder i e₂)
 weakenUnder i (prj₁ e) = prj₁ (weakenUnder i e)
 weakenUnder i (prj₂ e) = prj₂ (weakenUnder i e)
@@ -56,16 +65,23 @@ weakenUnder i (e₁ ∙ e₂) = weakenUnder i e₁ ∙ weakenUnder i e₂
 weaken : ∀{n} → Term n → Term (suc n)
 weaken = weakenUnder zero
 
+weaken*' : ∀{n} m → Term n → Term (m + n)
+weaken*' zero e = e
+weaken*' (suc i) e = weaken (weaken*' i e)
+
 weaken* : ∀{n} m → Term n → Term (n + m)
 weaken* {n} m rewrite +-comm n m = weaken*' m
-  where
-    weaken*' : ∀{n} m → Term n → Term (m + n)
-    weaken*' zero e = e
-    weaken*' (suc i) e = weaken (weaken*' i e)
 
 weakenSubst : ∀{n m} → (Fin n → Term m) → Fin (suc n) → Term (suc m)
 weakenSubst f zero = V zero
-weakenSubst f (suc j) = weaken (f j)
+weakenSubst f (suc x) = weaken (f x)
+
+weakenSubst*' : ∀{n m} k → (Fin n → Term m) → Fin (k + n) → Term (k + m)
+weakenSubst*' zero f = f
+weakenSubst*' (suc x) f = weakenSubst (weakenSubst*' x f)
+
+weakenSubst* : ∀{n m} k → (Fin n → Term m) → Fin (n + k) → Term (m + k)
+weakenSubst* {n} {m} k rewrite +-comm n k rewrite +-comm m k = weakenSubst*' k
 
 subst : ∀{n m} → (Fin n → Term m) → Term n → Term m
 subst f (V x) = f x
@@ -77,16 +93,3 @@ subst f (prj₁ e) = prj₁ (subst f e)
 subst f (prj₂ e) = prj₂ (subst f e)
 subst f (ƛ τ e) = ƛ τ (subst (weakenSubst f) e)
 subst f (e₁ ∙ e₂) = (subst f e₁ ∙ subst f e₂)
-
-plug : ∀{n} → Term zero → Term (suc n) → Term n
-plug {n} t = subst f
-  where
-    f : Fin (suc n) → Term n
-    f zero = weaken* n t
-    f (suc i) = V i
-
-compose-subst : ∀{a b c} →
-  (Fin a → Term c) →
-  (Fin b → Term c) →
-  (Fin (a + b) → Term c)
-compose-subst γ₁ γ₂ = {!!}
