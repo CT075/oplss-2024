@@ -1,59 +1,27 @@
-open import Data.Binding
-
-module STLC.Soundness {{_ : NomPa}} where
+module STLC.Soundness where
 
 open import Data.List using ([]; _∷_)
 open import Data.Product
 open import Data.Empty
+open import Data.Nat hiding (_/_)
+open import Data.Fin
 open import Data.Unit
-open import Relation.Binary.PropositionalEquality hiding (subst)
+open import Relation.Binary.PropositionalEquality hiding (subst; [_])
 open import Relation.Nullary using (yes; no)
 open import Function
-open import Effect.Applicative.Util
-
-open import Data.Binding.Operations
-open import Data.Binding.Context
 
 open import STLC.Syntax
 open import STLC.Typing
 open import STLC.Eval
 
-Substs = Ctx (Term ∅)
-
-subst-ext : ∀ {w : World} x (γ : Substs w) t e →
-  plug∅ t (subst∅Under x γ e) ≡ subst∅ (γ & x ~ t) e
-subst-ext x γ t (V x') =
-  -- This case is actually wrong in the case that x = x'. Specifically, if
-  -- γ already contains a binding [x ⊢> t'] for x, then
-  --   γ(x)[x/t] = t'[x/t] = t'
-  -- but
-  --   (γ[x ⊢> t])(x) = t
-  -- (because the outermost binding applies first).
-  {! !}
-subst-ext x γ t True = refl
-subst-ext x γ t False = refl
-subst-ext x γ t (if e then e₁ else e₂)
-  rewrite subst-ext x γ t e
-  rewrite subst-ext x γ t e₁
-  rewrite subst-ext x γ t e₂ = refl
-subst-ext x γ t (Pair e₁ e₂)
-  rewrite subst-ext x γ t e₁
-  rewrite subst-ext x γ t e₂ = refl
-subst-ext x γ t (prj₁ e) rewrite subst-ext x γ t e = refl
-subst-ext x γ t (prj₂ e) rewrite subst-ext x γ t e = refl
-subst-ext x γ t (ƛ x' τ e) = {!!}
-  where
-    foo = subst∅Under x' (γ & x ~ t) e
-subst-ext x γ t (e₁ ∙ e₂)
-  rewrite subst-ext x γ t e₁
-  rewrite subst-ext x γ t e₂ = refl
+Substs = Ctx (Term zero)
 
 mutual
-  _∈V'⟦_⟧ : Term ∅ → Type → Set
+  _∈V'⟦_⟧ : Term zero → Type → Set
   True ∈V'⟦ TBool ⟧ = ⊤
   False ∈V'⟦ TBool ⟧ = ⊤
   (Pair e₁ e₂) ∈V'⟦ TProd τ₁ τ₂ ⟧ = e₁ ∈V'⟦ τ₁ ⟧ × e₂ ∈V'⟦ τ₂ ⟧
-  (ƛ x τ e) ∈V'⟦ τ₁ ⇒ τ₂ ⟧ = τ ≡ τ₁ × (∀ v → v ∈V'⟦ τ₁ ⟧ → plug∅ v e ∈E'⟦ τ₂ ⟧)
+  (ƛ τ e) ∈V'⟦ τ₁ ⇒ τ₂ ⟧ = τ ≡ τ₁ × (∀ v → v ∈V'⟦ τ₁ ⟧ → plug v e ∈E'⟦ τ₂ ⟧)
   _ ∈V'⟦ _ ⟧ = ⊥
 
   -- This is actually a mistake; the true relation uses
@@ -65,21 +33,21 @@ mutual
   -- other direction, but we do not prove it here (because proving that this
   -- STLC is total either requires a stronger logical relation or something else
   -- quite complicated).
-  _∈E'⟦_⟧ : Term ∅ → Type → Set
+  _∈E'⟦_⟧ : Term zero → Type → Set
   e ∈E'⟦ τ ⟧ = ∃[ e' ](e ~>* e' × e' ∈V'⟦ τ ⟧)
 
 mutual
-  data _∈V⟦_⟧ : Term ∅ → Type → Set where
+  data _∈V⟦_⟧ : Term zero → Type → Set where
     v-bool-true : True ∈V⟦ TBool ⟧
     v-bool-false : False ∈V⟦ TBool ⟧
     v-pair : ∀{e₁ e₂ τ₁ τ₂} → e₁ ∈V⟦ τ₁ ⟧ → e₂ ∈V⟦ τ₂ ⟧ → Pair e₁ e₂ ∈V⟦ TProd τ₁ τ₂ ⟧
-    v-abs : ∀{τ x e τ'} → (∀ v → v ∈V'⟦ τ ⟧ → plug∅ v e ∈E⟦ τ' ⟧) → ƛ x τ e ∈V⟦ τ ⇒ τ' ⟧
+    v-abs : ∀{τ e τ'} → (∀ v → v ∈V'⟦ τ ⟧ → plug v e ∈E⟦ τ' ⟧) → ƛ τ e ∈V⟦ τ ⇒ τ' ⟧
 
-  record _∈E⟦_⟧ (e : Term ∅) (τ : Type) : Set where
+  record _∈E⟦_⟧ (e : Term zero) (τ : Type) : Set where
     inductive
     constructor E-fold
     field
-      v : Term ∅
+      v : Term zero
       e~>*v : e ~>* v
       v∈V⟦τ⟧ : v ∈V⟦ τ ⟧
 
@@ -88,7 +56,7 @@ mutual
   v-fold {True} {TBool} tt = v-bool-true
   v-fold {False} {TBool} tt = v-bool-false
   v-fold {Pair e₁ e₂} {TProd τ₁ τ₂} (e₁∈V' , e₂∈V') = v-pair (v-fold e₁∈V') (v-fold e₂∈V')
-  v-fold {ƛ x ττ e} {τ ⇒ τ'} (τ≡ττ , body-valid) rewrite τ≡ττ =
+  v-fold {ƛ ττ e} {τ ⇒ τ'} (τ≡ττ , body-valid) rewrite τ≡ττ =
     v-abs (λ v v∈V' → e-fold (body-valid v v∈V'))
 
   e-fold : ∀{e τ} → e ∈E'⟦ τ ⟧ → e ∈E⟦ τ ⟧
@@ -113,24 +81,24 @@ V-val (v-abs _) = abs-val
 V⇒E : ∀ e {τ} → e ∈V⟦ τ ⟧ → e ∈E⟦ τ ⟧
 V⇒E e e∈V⟦τ⟧ = E-fold e kleene-z e∈V⟦τ⟧
 
-record _∈G⟦_⟧ {w} (γ : Substs w) (Γ : Context w) : Set where
+record _∈G⟦_⟧ {n} (γ : Substs n) (Γ : Context n) : Set where
   field
-    defn-G⟦∙⟧ : ∀ x → γ(x) ∈V⟦ Γ(x) ⟧
+    defn-G⟦∙⟧ : ∀ x → (γ [ x ]) ∈V⟦ Γ [ x ] ⟧
 
 open _∈G⟦_⟧
 
 infix 4 _⊨_∈_
 
-_⊨_∈_ : ∀ {w} → Context w → Term w → Type → Set
-Γ ⊨ e ∈ τ = ∀ γ → γ ∈G⟦ Γ ⟧ → subst∅ γ e ∈E⟦ τ ⟧
+_⊨_∈_ : ∀ {n} → Context n → Term n → Type → Set
+Γ ⊨ e ∈ τ = ∀ γ → γ ∈G⟦ Γ ⟧ → (e / γ) ∈E⟦ τ ⟧
 
-fundamental-thm : ∀{w} {Γ : Context w} {e τ} → Γ ⊢ e ∈ τ → Γ ⊨ e ∈ τ
+fundamental-thm : ∀{n} {Γ : Context n} {e τ} → Γ ⊢ e ∈ τ → Γ ⊨ e ∈ τ
 fundamental-thm {_} {Γ} {V x} {τ} (typ-var Γ[x]≡τ) γ γ∈G⟦Γ⟧ = V⇒E v v∈V⟦τ⟧
   where
-    v = γ(x)
+    v = γ [ x ]
 
     -- not really sure why this needs to be its own function
-    rewrite-Γ[x]≡τ : ∀ v → v ∈V⟦ Γ x ⟧ → v ∈V⟦ τ ⟧
+    rewrite-Γ[x]≡τ : ∀ v → v ∈V⟦ Γ [ x ] ⟧ → v ∈V⟦ τ ⟧
     rewrite-Γ[x]≡τ v t rewrite Γ[x]≡τ = t
 
     v∈V⟦τ⟧ : v ∈V⟦ τ ⟧
@@ -141,17 +109,17 @@ fundamental-thm {_} {_} {if e then e₁ else e₂} {τ}
   (typ-if Γ⊢e∈Bool Γ⊢e₁∈τ Γ⊢e₂∈τ) γ γ∈G⟦Γ⟧ =
     unwrap γ[e]∈E⟦Bool⟧
   where
-    γ[e]∈E⟦Bool⟧ : subst∅ γ e ∈E⟦ TBool ⟧
+    γ[e]∈E⟦Bool⟧ : (e / γ) ∈E⟦ TBool ⟧
     γ[e]∈E⟦Bool⟧ = fundamental-thm Γ⊢e∈Bool γ γ∈G⟦Γ⟧
 
-    γ[e₁]∈E⟦τ⟧ : subst∅ γ e₁ ∈E⟦ τ ⟧
+    γ[e₁]∈E⟦τ⟧ : (e₁ / γ) ∈E⟦ τ ⟧
     γ[e₁]∈E⟦τ⟧ = fundamental-thm Γ⊢e₁∈τ γ γ∈G⟦Γ⟧
 
-    γ[e₂]∈E⟦τ⟧ : subst∅ γ e₂ ∈E⟦ τ ⟧
+    γ[e₂]∈E⟦τ⟧ : (e₂ / γ) ∈E⟦ τ ⟧
     γ[e₂]∈E⟦τ⟧ = fundamental-thm Γ⊢e₂∈τ γ γ∈G⟦Γ⟧
 
-    unwrap : subst∅ γ e ∈E⟦ TBool ⟧ →
-      (if subst∅ γ e then subst∅ γ e₁ else subst∅ γ e₂) ∈E⟦ τ ⟧
+    unwrap : (e / γ) ∈E⟦ TBool ⟧ →
+      (if (e / γ) then (e₁ / γ) else (e₂ / γ)) ∈E⟦ τ ⟧
     unwrap (E-fold True e~>*True v-bool-true) =
       E-fold
         (_∈E⟦_⟧.v γ[e₁]∈E⟦τ⟧)
@@ -170,16 +138,16 @@ fundamental-thm {_} {_} {Pair e₁ e₂} {TProd τ₁ τ₂}
     (typ-prod Γ⊢e₁∈τ₁ Γ⊢e₂∈τ₂) γ γ∈G⟦Γ⟧ =
   rewrap γ[e₁]∈E⟦τ₁⟧ γ[e₂]∈E⟦τ₂⟧
   where
-    γ[e₁]∈E⟦τ₁⟧ : subst∅ γ e₁ ∈E⟦ τ₁ ⟧
+    γ[e₁]∈E⟦τ₁⟧ : (e₁ / γ) ∈E⟦ τ₁ ⟧
     γ[e₁]∈E⟦τ₁⟧ = fundamental-thm Γ⊢e₁∈τ₁ γ γ∈G⟦Γ⟧
 
-    γ[e₂]∈E⟦τ₂⟧ : subst∅ γ e₂ ∈E⟦ τ₂ ⟧
+    γ[e₂]∈E⟦τ₂⟧ : (e₂ / γ) ∈E⟦ τ₂ ⟧
     γ[e₂]∈E⟦τ₂⟧ = fundamental-thm Γ⊢e₂∈τ₂ γ γ∈G⟦Γ⟧
 
     rewrap :
-      subst∅ γ e₁ ∈E⟦ τ₁ ⟧ →
-      subst∅ γ e₂ ∈E⟦ τ₂ ⟧ →
-      subst∅ γ (Pair e₁ e₂) ∈E⟦ TProd τ₁ τ₂ ⟧
+      (e₁ / γ) ∈E⟦ τ₁ ⟧ →
+      (e₂ / γ) ∈E⟦ τ₂ ⟧ →
+      (Pair e₁ e₂ / γ) ∈E⟦ TProd τ₁ τ₂ ⟧
     rewrap (E-fold v₁ e₁~>*v₁ v₁∈V⟦τ₁⟧) (E-fold v₂ e₂~>*v₂ v₂∈V⟦τ₂⟧) =
       E-fold
         (Pair v₁ v₂)
@@ -190,10 +158,10 @@ fundamental-thm {_} {_} {Pair e₁ e₂} {TProd τ₁ τ₂}
 fundamental-thm {_} {_} {prj₁ e} (typ-prj₁ {_} {τ₁} {τ₂} Γ⊢e∈τ) γ γ∈G⟦Γ⟧ =
     unwrap γ[e]∈E⟦τ⟧
   where
-    γ[e]∈E⟦τ⟧ : subst∅ γ e ∈E⟦ TProd τ₁ τ₂ ⟧
+    γ[e]∈E⟦τ⟧ : (e / γ) ∈E⟦ TProd τ₁ τ₂ ⟧
     γ[e]∈E⟦τ⟧ = fundamental-thm Γ⊢e∈τ γ γ∈G⟦Γ⟧
 
-    unwrap : subst∅ γ e ∈E⟦ TProd τ₁ τ₂ ⟧ → prj₁ (subst∅ γ e) ∈E⟦ τ₁ ⟧
+    unwrap : (e / γ) ∈E⟦ TProd τ₁ τ₂ ⟧ → prj₁ (e / γ) ∈E⟦ τ₁ ⟧
     unwrap (E-fold (Pair v₁ v₂) e~>*vs (vs∈V@(v-pair v₁∈V⟦τ₁⟧ v₂∈V⟦τ₂⟧))) =
       E-fold
         v₁
@@ -202,29 +170,23 @@ fundamental-thm {_} {_} {prj₁ e} (typ-prj₁ {_} {τ₁} {τ₂} Γ⊢e∈τ) 
 fundamental-thm {_} {_} {prj₂ e} (typ-prj₂ {_} {τ₁} {τ₂} Γ⊢e∈τ) γ γ∈G⟦Γ⟧ =
     unwrap γ[e]∈E⟦τ⟧
   where
-    γ[e]∈E⟦τ⟧ : subst∅ γ e ∈E⟦ TProd τ₁ τ₂ ⟧
+    γ[e]∈E⟦τ⟧ : (e / γ) ∈E⟦ TProd τ₁ τ₂ ⟧
     γ[e]∈E⟦τ⟧ = fundamental-thm Γ⊢e∈τ γ γ∈G⟦Γ⟧
 
-    unwrap : subst∅ γ e ∈E⟦ TProd τ₁ τ₂ ⟧ → prj₂ (subst∅ γ e) ∈E⟦ τ₂ ⟧
+    unwrap : (e / γ) ∈E⟦ TProd τ₁ τ₂ ⟧ → prj₂ (e / γ) ∈E⟦ τ₂ ⟧
     unwrap (E-fold (Pair v₁ v₂) e~>*vs (vs∈V@(v-pair v₁∈V⟦τ₁⟧ v₂∈V⟦τ₂⟧))) =
       E-fold
         v₂
         (kleene-snoc (step-prj₂* e~>*vs) (step-prj₂-app (V-val vs∈V)))
         v₂∈V⟦τ₂⟧
-fundamental-thm {_} {_} {ƛxe@(ƛ x τ e)} (typ-abs {_} {_} {τ'} Γ,x~τ⊢e∈τ') γ γ∈G⟦Γ⟧ =
-  E-fold (subst∅ γ ƛxe) kleene-z γ[ƛxe]∈V⟦τ⇒τ'⟧
+fundamental-thm {_} {_} {ƛxe@(ƛ τ e)} (typ-abs {_} {_} {τ'} Γ,x~τ⊢e∈τ') γ γ∈G⟦Γ⟧ =
+  E-fold (ƛxe / γ) kleene-z {!!}
   where
-    γ[ƛxe] : Term ∅
-    γ[ƛxe] = subst∅ γ (ƛ x τ e)
+    γ[ƛxe] : Term zero
+    γ[ƛxe] = (ƛ τ e) / γ
 
-    γ[e] : Term (zeroᴮ ◃ ∅)
-    γ[e] = subst∅Under x γ e
-
-    body-valid : ∀ v → v ∈V'⟦ τ ⟧ → plug∅ v γ[e] ∈E⟦ τ' ⟧
-    body-valid v v∈V'⟦τ⟧ = E-fold {!!} {!!} {!!}
-
-    γ[ƛxe]∈V⟦τ⇒τ'⟧ : subst∅ γ ƛxe ∈V⟦ τ ⇒ τ' ⟧
-    γ[ƛxe]∈V⟦τ⇒τ'⟧ = v-abs {!!}
+    foo : Term (suc zero)
+    foo = e / (γ ↑)
 fundamental-thm (typ-app a b) γ γ∈G⟦Γ⟧ = {!!}
 
 E-exists-forall : ∀ {e τ} →

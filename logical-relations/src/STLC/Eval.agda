@@ -1,7 +1,6 @@
-open import Data.Binding
+module STLC.Eval where
 
-module STLC.Eval {{_ : NomPa}} where
-
+open import Data.Nat
 open import Data.Empty
 open import Data.Product
 open import Relation.Binary.PropositionalEquality
@@ -11,13 +10,13 @@ open import STLC.Syntax
 
 infix 5 _val
 
-data _val : Term ∅ → Set where
+data _val : Term zero → Set where
   true-val : True val
   false-val : False val
   prod-val : ∀{e₁ e₂} → e₁ val → e₂ val → (Pair e₁ e₂) val
-  abs-val : ∀{τ x e} → ƛ τ x e val
+  abs-val : ∀{τ e} → ƛ τ e val
 
-val-decidable : (e : Term ∅) → Dec (e val)
+val-decidable : (e : Term zero) → Dec (e val)
 val-decidable True = yes true-val
 val-decidable False = yes false-val
 val-decidable (Pair e₁ e₂) with val-decidable e₁ , val-decidable e₂
@@ -25,7 +24,7 @@ val-decidable (Pair e₁ e₂) with val-decidable e₁ , val-decidable e₂
 ... | no ¬e₁val , yes e₂val = no (λ { (prod-val e₁val _) → ¬e₁val e₁val })
 ... | yes e₁val , no ¬e₂val = no (λ { (prod-val _ e₂val) → ¬e₂val e₂val })
 ... | no ¬e₁val , no ¬e₂val = no (λ { (prod-val e₁val _) → ¬e₁val e₁val })
-val-decidable (ƛ x τ e) = yes abs-val
+val-decidable (ƛ τ e) = yes abs-val
 val-decidable (V _) = no (λ ())
 val-decidable (if _ then _ else _) = no (λ ())
 val-decidable (prj₁ _) = no (λ ())
@@ -34,7 +33,7 @@ val-decidable (_ ∙ _) = no (λ ())
 
 infix 4 _~>_
 
-data _~>_ : Term ∅ → Term ∅ → Set where
+data _~>_ : Term zero → Term zero → Set where
   step-if : ∀{e e' e₁ e₂} →
     e ~> e' →
     if e then e₁ else e₂ ~> if e' then e₁ else e₂
@@ -47,12 +46,12 @@ data _~>_ : Term ∅ → Term ∅ → Set where
   step-prj₂-mid : ∀{e e'} → e ~> e' → prj₂ e ~> prj₂ e'
   step-prj₂-app : ∀{e₁ e₂} → (Pair e₁ e₂) val → prj₂ (Pair e₁ e₂) ~> e₂
   step-app₁ : ∀{e₁ e₁' e₂} → e₁ ~> e₁' → e₁ ∙ e₂ ~> e₁' ∙ e₂
-  step-app₂ : ∀{τ x e₁ e₂ e₂'} → e₂ ~> e₂' → ƛ x τ e₁ ∙ e₂ ~> ƛ x τ e₁ ∙ e₂'
-  step-app : ∀{τ x e₁ e₂ e} → e ≡ plug∅ e₂ e₁ → e₂ val → ƛ x τ e₁ ∙ e₂ ~> e
+  step-app₂ : ∀{τ e₁ e₂ e₂'} → e₂ ~> e₂' → ƛ τ e₁ ∙ e₂ ~> ƛ τ e₁ ∙ e₂'
+  step-app : ∀{τ e₁ e₂ e} → e ≡ plug e₂ e₁ → e₂ val → ƛ τ e₁ ∙ e₂ ~> e
 
 infix 4 _~>*_
 
-data _~>*_ : Term ∅ → Term ∅ → Set where
+data _~>*_ : Term zero → Term zero → Set where
   kleene-z : ∀{e} → e ~>* e
   kleene-cons : ∀{e e' e''} → e ~> e' → e' ~>* e'' → e ~>* e''
 
@@ -67,7 +66,7 @@ kleene-append (kleene-cons e₁~>e e~>*e₂) e₂~>*e₃ =
 kleene-snoc : ∀{e₁ e₂ e₃} → e₁ ~>* e₂ → e₂ ~> e₃ → e₁ ~>* e₃
 kleene-snoc e₁~>*e₂ e₂~>e₃ = kleene-append e₁~>*e₂ (kleene-singleton e₂~>e₃)
 
-iter-step : ∀{e₁ e₃ : Term ∅} {F : Term ∅ → Term ∅} →
+iter-step : ∀{e₁ e₃ : Term zero} {F : Term zero → Term zero} →
   (∀{e e'} → e ~> e' → F e ~> F e') →
   e₁ ~>* e₃ → F e₁ ~>* F e₃
 iter-step f kleene-z = kleene-z
@@ -90,10 +89,10 @@ step-prj₁* = iter-step step-prj₁-mid
 step-prj₂* : ∀{e e'} → e ~>* e' → prj₂ e ~>* prj₂ e'
 step-prj₂* = iter-step step-prj₂-mid
 
-reduces : Term ∅ → Set
+reduces : Term zero → Set
 reduces e = ∃[ e' ](e ~> e')
 
-irred : Term ∅ → Set
+irred : Term zero → Set
 irred e = ¬ (reduces e)
 
 val-irred : ∀{e} → e val → irred e
@@ -103,7 +102,7 @@ val-irred abs-val ()
 val-irred (prod-val e₁val e₂val) (_ , step-prod₁ e₁~>e₁') = val-irred e₁val (_ , e₁~>e₁')
 val-irred (prod-val e₁val e₂val) (_ , step-prod₂ _ e₂~>e₂') = val-irred e₂val (_ , e₂~>e₂')
 
-reduces-decidable : (e : Term ∅) → Dec (reduces e)
+reduces-decidable : (e : Term zero) → Dec (reduces e)
 reduces-decidable (V v) = no (λ ())
 reduces-decidable True = no (λ ())
 reduces-decidable False = no (λ ())
@@ -117,7 +116,7 @@ reduces-decidable (if e then e₁ else e₂) with reduces-decidable e
 ...   | Pair _ _ = no (λ { (if e' then _ else _ , step-if e~>) → ¬e~> (e' , e~>) })
 ...   | prj₁ _ = no (λ { (if e' then _ else _ , step-if e~>) → ¬e~> (e' , e~>) })
 ...   | prj₂ _ = no (λ { (if e' then _ else _ , step-if e~>) → ¬e~> (e' , e~>) })
-...   | ƛ _ _ _ = no (λ { (if e' then _ else _ , step-if e~>) → ¬e~> (e' , e~>) })
+...   | ƛ _ _ = no (λ { (if e' then _ else _ , step-if e~>) → ¬e~> (e' , e~>) })
 ...   | _ ∙ _ = no (λ { (if e' then _ else _ , step-if e~>) → ¬e~> (e' , e~>) })
 reduces-decidable (Pair e₁ e₂) with reduces-decidable e₁
 ... | yes (e₁' , e₁~>e₁') = yes (Pair e₁' e₂ , step-prod₁ e₁~>e₁')
@@ -144,7 +143,7 @@ reduces-decidable (prj₁ e) with reduces-decidable e
 ...   | if _ then _ else _ = no (λ { (prj₁ e' , step-prj₁-mid e~>) → ¬e~> (e' , e~>)})
 ...   | prj₁ _ = no (λ { (prj₁ e' , step-prj₁-mid e~>) → ¬e~> (e' , e~>)})
 ...   | prj₂ _ = no (λ { (prj₁ e' , step-prj₁-mid e~>) → ¬e~> (e' , e~>)})
-...   | ƛ _ _ _ = no (λ { (prj₁ e' , step-prj₁-mid e~>) → ¬e~> (e' , e~>)})
+...   | ƛ _ _ = no (λ { (prj₁ e' , step-prj₁-mid e~>) → ¬e~> (e' , e~>)})
 ...   | _ ∙ _ = no (λ { (prj₁ e' , step-prj₁-mid e~>) → ¬e~> (e' , e~>)})
 ...   | Pair e₁ e₂ with val-decidable (Pair e₁ e₂)
 ...     | yes e-val = yes (e₁ , step-prj₁-app e-val)
@@ -161,7 +160,7 @@ reduces-decidable (prj₂ e) with reduces-decidable e
 ...   | if _ then _ else _ = no (λ { (prj₂ e' , step-prj₂-mid e~>) → ¬e~> (e' , e~>)})
 ...   | prj₁ _ = no (λ { (prj₂ e' , step-prj₂-mid e~>) → ¬e~> (e' , e~>)})
 ...   | prj₂ _ = no (λ { (prj₂ e' , step-prj₂-mid e~>) → ¬e~> (e' , e~>)})
-...   | ƛ _ _ _ = no (λ { (prj₂ e' , step-prj₂-mid e~>) → ¬e~> (e' , e~>)})
+...   | ƛ _ _ = no (λ { (prj₂ e' , step-prj₂-mid e~>) → ¬e~> (e' , e~>)})
 ...   | _ ∙ _ = no (λ { (prj₂ e' , step-prj₂-mid e~>) → ¬e~> (e' , e~>)})
 ...   | Pair e₁ e₂ with val-decidable (Pair e₁ e₂)
 ...     | yes e-val = yes (e₂ , step-prj₂-app e-val)
@@ -169,7 +168,7 @@ reduces-decidable (prj₂ e) with reduces-decidable e
           { (prj₂ e' , step-prj₂-mid e~>) → ¬e~> (e' , e~>)
           ; (_ , step-prj₂-app e-val) → ¬e-val e-val
           })
-reduces-decidable (ƛ x τ e) = no (λ ())
+reduces-decidable (ƛ τ e) = no (λ ())
 reduces-decidable (e₁ ∙ e₂) with reduces-decidable e₁
 ... | yes (e₁' , e₁~>e₁') = yes (e₁' ∙ e₂ , step-app₁ e₁~>e₁')
 ... | no ¬e₁~> with e₁
@@ -181,10 +180,10 @@ reduces-decidable (e₁ ∙ e₂) with reduces-decidable e₁
 ...   | prj₁ _ = no (λ { (e₁' ∙ e₂ , step-app₁ e₁~>) → ¬e₁~> (e₁' , e₁~>) })
 ...   | prj₂ _ = no (λ { (e₁' ∙ e₂ , step-app₁ e₁~>) → ¬e₁~> (e₁' , e₁~>) })
 ...   | _ ∙ _ = no (λ { (e₁' ∙ e₂ , step-app₁ e₁~>) → ¬e₁~> (e₁' , e₁~>) })
-...   | ƛ x τ e with reduces-decidable e₂
-...     | yes (e₂' , e₂~>e₂') = yes (ƛ x τ e ∙ e₂' , step-app₂ e₂~>e₂')
+...   | ƛ τ e with reduces-decidable e₂
+...     | yes (e₂' , e₂~>e₂') = yes (ƛ τ e ∙ e₂' , step-app₂ e₂~>e₂')
 ...     | no ¬e₂~> with val-decidable e₂
-...       | yes e₂val = yes (plug∅ e₂ e , step-app refl e₂val)
+...       | yes e₂val = yes (plug e₂ e , step-app refl e₂val)
 ...       | no ¬e₂val = no (λ
             { (e₁ ∙ e₂' , step-app₂ e₂~>) → ¬e₂~> (e₂' , e₂~>)
             ; (e[e₂/x] , step-app _ e₂val) → ¬e₂val (e₂val)

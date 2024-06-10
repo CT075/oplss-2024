@@ -1,12 +1,11 @@
 module STLC.Syntax where
 
 open import Data.Nat using (ℕ; suc; zero; _+_)
-open import Data.Nat.Properties using (+-comm)
-open import Data.Bool using (true; false)
-open import Data.Fin hiding (_+_)
-open import Data.Fin.Properties
-open import Relation.Nullary.Decidable hiding (True; False)
-open import Function
+open import Data.Fin hiding (lift)
+import Data.Vec as Vec
+open import Data.Vec using (_∷_; []) public
+import Data.Fin.Substitution as S
+open import Data.Fin.Substitution.Lemmas
 
 infix 19 _⇒_
 infix 20 if_then_else_
@@ -27,69 +26,42 @@ data Term (n : ℕ) : Set where
   ƛ : Type → Term (suc n) → Term n
   _∙_ : Term n → Term n → Term n
 
--- TODO: make this work dependently
-Context : Set → ℕ → Set
-Context T n = Fin n → T
+Ctx : ∀ {ℓ} (T : Set ℓ) → ℕ → Set ℓ
+Ctx = Vec.Vec
 
-infix 4 _~&_
-infix 4 _~∘_
+infix 10 _[_]
 
-nil : ∀{T} → Context T zero
-nil ()
+_[_] : ∀{ℓ} {T : Set ℓ} {n} → Ctx T n → Fin n → T
+[] [ () ]
+(x ∷ _) [ zero ] = x
+(_ ∷ Γ) [ suc i ] = Γ [ i ]
 
-_~&_ : ∀{T n} → T → Context T n → Context T (suc n)
-_~&_ c Γ zero = c
-_~&_ c Γ (suc n) = Γ(n)
+module TermApp {T : ℕ → Set} (l : S.Lift T Term) where
+  infix 8 _/_
 
-drop : ∀{T n} → Context T (suc n) → Context T n
-drop γ = γ ∘ suc
+  open S.Lift l
 
-_~∘_ : ∀{T a b} → Context T a → Context T b → Context T (a + b)
-_~∘_ {_} {zero} γ₁ γ₂ = γ₂
-_~∘_ {_} {suc n} γ₁ γ₂ = γ₁(zero) ~& (drop(γ₁) ~∘ γ₂)
+  _/_ : ∀{m n} → Term m → S.Sub T m n → Term n
+  V x / σ = lift (σ [ x ])
+  True / σ = True
+  False / σ = False
+  if e then e₁ else e₂ / σ = if (e / σ) then (e₁ / σ) else (e₂ / σ)
+  Pair e₁ e₂ / σ = Pair (e₁ / σ) (e₂ / σ)
+  prj₁ e / σ = prj₁ (e / σ)
+  prj₂ e / σ = prj₂ (e / σ)
+  ƛ τ e / σ = ƛ τ (e / σ ↑)
+  (e₁ ∙ e₂) / σ = (e₁ / σ) ∙ (e₂ / σ)
 
-weakenUnder : ∀{n} → Fin (suc n) → Term n → Term (suc n)
-weakenUnder i (V x) with i ≤? x
-... | true because _ = V (suc x)
-... | false because _ = V (inject₁ x)
-weakenUnder i True = True
-weakenUnder i False = False
-weakenUnder i (if e then e₁ else e₂) =
-  if weakenUnder i e then weakenUnder i e₁ else weakenUnder i e₂
-weakenUnder i (Pair e₁ e₂) = Pair (weakenUnder i e₁) (weakenUnder i e₂)
-weakenUnder i (prj₁ e) = prj₁ (weakenUnder i e)
-weakenUnder i (prj₂ e) = prj₂ (weakenUnder i e)
-weakenUnder i (ƛ τ e) = ƛ τ (weakenUnder (suc i) e)
-weakenUnder i (e₁ ∙ e₂) = weakenUnder i e₁ ∙ weakenUnder i e₂
+termSubst : S.TermSubst Term
+termSubst = record {var = V; app = _/_}
+  where
+    open TermApp
 
-weaken : ∀{n} → Term n → Term (suc n)
-weaken = weakenUnder zero
+termLift = S.TermSubst.termLift termSubst
+varSubst = S.TermSubst.varLift termSubst
 
-weaken*' : ∀{n} m → Term n → Term (m + n)
-weaken*' zero e = e
-weaken*' (suc i) e = weaken (weaken*' i e)
+open S.Lift termLift using (sub ; _↑ ; weaken) public
+open TermApp termLift using (_/_) public
 
-weaken* : ∀{n} m → Term n → Term (n + m)
-weaken* {n} m rewrite +-comm n m = weaken*' m
-
-weakenSubst : ∀{n m} → (Fin n → Term m) → Fin (suc n) → Term (suc m)
-weakenSubst f zero = V zero
-weakenSubst f (suc x) = weaken (f x)
-
-weakenSubst*' : ∀{n m} k → (Fin n → Term m) → Fin (k + n) → Term (k + m)
-weakenSubst*' zero f = f
-weakenSubst*' (suc x) f = weakenSubst (weakenSubst*' x f)
-
-weakenSubst* : ∀{n m} k → (Fin n → Term m) → Fin (n + k) → Term (m + k)
-weakenSubst* {n} {m} k rewrite +-comm n k rewrite +-comm m k = weakenSubst*' k
-
-subst : ∀{n m} → (Fin n → Term m) → Term n → Term m
-subst f (V x) = f x
-subst f True = True
-subst f False = False
-subst f (if e then e₁ else e₂) = if subst f e then subst f e₁ else subst f e₂
-subst f (Pair e₁ e₂) = Pair (subst f e₁) (subst f e₂)
-subst f (prj₁ e) = prj₁ (subst f e)
-subst f (prj₂ e) = prj₂ (subst f e)
-subst f (ƛ τ e) = ƛ τ (subst (weakenSubst f) e)
-subst f (e₁ ∙ e₂) = (subst f e₁ ∙ subst f e₂)
+plug : ∀{n} → Term n → Term (suc n) → Term n
+plug t e = e / (sub t)
