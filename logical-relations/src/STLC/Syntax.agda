@@ -5,6 +5,7 @@ open import Data.Nat.Properties using (+-comm)
 open import Data.Bool using (true; false)
 open import Data.Fin hiding (_+_)
 open import Data.Fin.Properties
+open import Relation.Binary.Definitions as B
 open import Relation.Nullary.Decidable hiding (True; False)
 open import Function
 
@@ -32,7 +33,6 @@ Context : Set → ℕ → Set
 Context T n = Fin n → T
 
 infix 4 _~&_
-infix 4 _~∘_
 
 nil : ∀{T} → Context T zero
 nil ()
@@ -44,14 +44,14 @@ _~&_ c Γ (suc n) = Γ(n)
 drop : ∀{T n} → Context T (suc n) → Context T n
 drop γ = γ ∘ suc
 
-_~∘_ : ∀{T a b} → Context T a → Context T b → Context T (a + b)
-_~∘_ {_} {zero} γ₁ γ₂ = γ₂
-_~∘_ {_} {suc n} γ₁ γ₂ = γ₁(zero) ~& (drop(γ₁) ~∘ γ₂)
+-- This is `if x < i then x else suc x`. We flip the condition to i ≤ x because
+-- Data.Nat uses `i ≤ x` as the fundamental operation.
+weakenUnderV : ∀{n} {i : Fin (suc n)} (x : Fin n) → Dec (i ≤ x) → Fin (suc n)
+weakenUnderV x (true because _) = suc x
+weakenUnderV x (false because _) = inject₁ x
 
 weakenUnder : ∀{n} → Fin (suc n) → Term n → Term (suc n)
-weakenUnder i (V x) with i ≤? x
-... | true because _ = V (suc x)
-... | false because _ = V (inject₁ x)
+weakenUnder i (V x) = V (weakenUnderV x (i ≤? x))
 weakenUnder i True = True
 weakenUnder i False = False
 weakenUnder i (if e then e₁ else e₂) =
@@ -93,3 +93,20 @@ subst f (prj₁ e) = prj₁ (subst f e)
 subst f (prj₂ e) = prj₂ (subst f e)
 subst f (ƛ τ e) = ƛ τ (subst (weakenSubst f) e)
 subst f (e₁ ∙ e₂) = (subst f e₁ ∙ subst f e₂)
+
+plugV : ∀{n} {i : Fin (suc n)} (t : Term n) (x : Fin (suc n)) →
+  Ordering i x → Term n
+plugV t x = {!!}
+
+plugVar : ∀{n} → (i : Fin (suc n)) → Term n → (x : Fin (suc n)) → Term n
+plugVar {n} i t x = {!!}
+
+plugi : ∀{n} → Fin (suc n) → Term n → Term (suc n) → Term n
+plugi {n} i t = subst (plugVar i t)
+
+plug : ∀{n} → Term n → Term (suc n) → Term n
+plug {n} t = subst f
+  where
+    f : Fin (suc n) → Term n
+    f zero = t
+    f (suc n) = V n

@@ -3,82 +3,98 @@ module STLC.Syntax.Lemmas where
 open import STLC.Syntax
 
 open import Data.Nat using (ℕ; zero; suc; _+_)
-open import Data.Nat.Properties
+open import Data.Nat.Properties hiding (_≤?_)
 open import Data.Fin hiding (_+_)
+open import Data.Fin.Properties
+open import Data.Bool using (true; false)
 open import Relation.Binary.PropositionalEquality hiding (subst)
+open import Relation.Nullary.Decidable hiding (True; False)
 open import Function
 
-mutual
-  weakenSubst/id : ∀{n} → (γ : Fin n → Term n) →
-    (∀ e → subst γ e ≡ e) →
-    (∀ e → subst (weakenSubst γ) e ≡ e)
-  weakenSubst/id γ f (V zero) = refl
-  weakenSubst/id γ f (V (suc i)) =
-    begin
-      subst (weakenSubst γ) (V (suc i))
-    ≡⟨⟩
-      weaken (γ i)
-    ≡⟨⟩
-      weaken (subst γ (V i))
-    ≡⟨ {! f (V i) !} ⟩
-      V (suc i)
-    ∎
-    where
-      open ≡-Reasoning
-      foo : weaken (subst γ (V i)) ≡ V (suc i)
-      foo = {! f (V i) !}
-  weakenSubst/id γ f True = refl
-  weakenSubst/id γ f False = refl
-  weakenSubst/id γ f (if e then e₁ else e₂)
-    rewrite weakenSubst/id γ f e
-    rewrite weakenSubst/id γ f e₁
-    rewrite weakenSubst/id γ f e₂ = refl
-  weakenSubst/id γ f (Pair e₁ e₂)
-    rewrite weakenSubst/id γ f e₁
-    rewrite weakenSubst/id γ f e₂ = refl
-  weakenSubst/id γ f (prj₁ e) rewrite weakenSubst/id γ f e = refl
-  weakenSubst/id γ f (prj₂ e) rewrite weakenSubst/id γ f e = refl
-  weakenSubst/id γ f (ƛ τ e) = result
-    where
-      foo : subst (weakenSubst (weakenSubst γ)) e ≡ e
-      foo = weakenSubst/id (weakenSubst γ) (weakenSubst/id γ f) e
+plug/weakenUnder : ∀{n} i → (t : Term n) → (e : Term n) → plug t (weakenUnder i e) ≡ e
+plug/weakenUnder i t (V x) = lemma (i ≤? x) refl
+  where
+    open ≡-Reasoning
 
-      result : ƛ τ (subst (weakenSubst (weakenSubst γ)) e) ≡ ƛ τ e
-      result rewrite foo = refl
-  weakenSubst/id γ f (e₁ ∙ e₂)
-    rewrite weakenSubst/id γ f e₁
-    rewrite weakenSubst/id γ f e₂ = refl
+    lemma : (p : Dec (i ≤ x)) → (i ≤? x) ≡ p → plug t (weakenUnder i (V x)) ≡ V x
+    lemma p@(true because _) i≤?x≡true = begin
+        plug t (weakenUnder i (V x))
+      ≡⟨⟩
+        plug t (V (weakenUnderV x (i ≤? x)))
+      ≡⟨ cong (plug t ∘ V ∘ weakenUnderV x) i≤?x≡true ⟩
+        plug t (V (weakenUnderV x p))
+      ≡⟨⟩
+        plug t (V (suc x))
+      ≡⟨⟩
+        V x
+      ∎
+    lemma p@(false because ¬i≤x) i≤?x≡false = begin
+        plug t (weakenUnder i (V x))
+      ≡⟨⟩
+        plug t (V (weakenUnderV x (i ≤? x)))
+      ≡⟨ cong (plug t ∘ V ∘ weakenUnderV x) i≤?x≡false ⟩
+        plug t (V (weakenUnderV x p))
+      ≡⟨⟩
+        plug t (V (inject₁ x))
+      ≡⟨ {!!} ⟩
+        V x
+      ∎
+plug/weakenUnder i t True = refl
+plug/weakenUnder i t False = refl
+plug/weakenUnder i t (if e then e₁ else e₂)
+  rewrite plug/weakenUnder i t e
+  rewrite plug/weakenUnder i t e₁
+  rewrite plug/weakenUnder i t e₂ = refl
+plug/weakenUnder i t (Pair e₁ e₂)
+  rewrite plug/weakenUnder i t e₁
+  rewrite plug/weakenUnder i t e₂ = refl
+plug/weakenUnder i t (prj₁ e)
+  rewrite plug/weakenUnder i t e = refl
+plug/weakenUnder i t (prj₂ e)
+  rewrite plug/weakenUnder i t e = refl
+plug/weakenUnder i t (ƛ τ e)
+  rewrite plug/weakenUnder (suc i) (weaken t) e = {! !}
+plug/weakenUnder i t (e₁ ∙ e₂)
+  rewrite plug/weakenUnder i t e₁
+  rewrite plug/weakenUnder i t e₂ = refl
 
-  subst/zero : (γ : Fin zero → Term zero) → (e : Term zero) → subst γ e ≡ e
-  subst/zero γ True = refl
-  subst/zero γ False = refl
-  subst/zero γ (if e then e₁ else e₂)
-    rewrite subst/zero γ e
-    rewrite subst/zero γ e₁
-    rewrite subst/zero γ e₂ = refl
-  subst/zero γ (Pair e₁ e₂)
-    rewrite subst/zero γ e₁
-    rewrite subst/zero γ e₂ = refl
-  subst/zero γ (prj₁ e) rewrite subst/zero γ e = refl
-  subst/zero γ (prj₂ e) rewrite subst/zero γ e = refl
-  subst/zero γ (ƛ τ e) = {! !}
-  subst/zero γ (e₁ ∙ e₂)
-    rewrite subst/zero γ e₁
-    rewrite subst/zero γ e₂ = refl
-
-{-
-∘~/defn : ∀{n m} →
-  (γ₁ : Context (Term zero) n) → (γ₂ : Context (Term zero) m) →
-  (e : Term (n + m)) →
-  subst (γ₁ ~∘ γ₂) e ≡ subst γ₂ (subst (weakenSubst* m γ₁) e)
-∘~/defn {zero} γ₁ γ₂ e =
-  begin
-    subst (γ₁ ~∘ γ₂) e
+plug/subst : ∀{n m} →
+  (t : Term m) → (γ : Context (Term m) n) → (e : Term (suc n)) →
+  plug t (subst (weakenSubst γ) e) ≡ subst (t ~& γ) e
+plug/subst t γ (V zero) = refl
+plug/subst t γ (V (suc i)) = begin
+    plug t (subst (weakenSubst γ) (V (suc i)))
   ≡⟨⟩
-    subst γ₂ e
-  ≡⟨ {!!} ⟩
-    {!!}
+    plug t (weaken (γ i))
+  ≡⟨ plug/weakenUnder _ t (γ i) ⟩
+    γ i
   ∎
   where
     open ≡-Reasoning
--}
+plug/subst t γ True = refl
+plug/subst t γ False = refl
+plug/subst t γ (if e then e₁ else e₂)
+  rewrite plug/subst t γ e
+  rewrite plug/subst t γ e₁
+  rewrite plug/subst t γ e₂ = refl
+plug/subst t γ (Pair e₁ e₂)
+  rewrite plug/subst t γ e₁
+  rewrite plug/subst t γ e₂ = refl
+plug/subst t γ (prj₁ e) rewrite plug/subst t γ e = refl
+plug/subst t γ (prj₂ e) rewrite plug/subst t γ e = refl
+plug/subst t γ (ƛ τ e) = begin
+    plug t (subst (weakenSubst γ) (ƛ τ e))
+  ≡⟨⟩
+    plug t (ƛ τ (subst (weakenSubst (weakenSubst γ)) e))
+  ≡⟨ {!!} ⟩
+    ƛ τ (plug (weaken t) (subst (weakenSubst (weakenSubst γ)) e))
+  ≡⟨ cong (ƛ τ) {! (plug/subst (weaken t) (weakenSubst γ) e) !} ⟩
+    ƛ τ (subst (weakenSubst (t ~& γ)) e)
+  ≡⟨⟩
+    subst (t ~& γ) (ƛ τ e)
+  ∎
+  where
+    open ≡-Reasoning
+plug/subst t γ (e₁ ∙ e₂)
+  rewrite plug/subst t γ e₁
+  rewrite plug/subst t γ e₂ = refl
