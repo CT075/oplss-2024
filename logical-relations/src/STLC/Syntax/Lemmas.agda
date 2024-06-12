@@ -13,10 +13,10 @@ open import Function
 
 plugi/weakenUnder : ∀{n} i → (t : Term n) → (e : Term n) → plugi i t (weakenUnder i e) ≡ e
 plugi/weakenUnder i t (V x) = {!!}
-  {-
   where
     open ≡-Reasoning
 
+    {-
     lemma : (p : Dec (i ≤ x)) → (i ≤? x) ≡ p → plugi i t (weakenUnder i (V x)) ≡ V x
     lemma p@(true because _) i≤?x≡true = begin
         plug t (weakenUnder i (V x))

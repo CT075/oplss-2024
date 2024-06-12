@@ -50,7 +50,7 @@ drop γ = γ ∘ suc
 
 -- This is `if x < i then x else suc x`. We flip the condition to i ≤ x because
 -- Data.Nat uses `i ≤ x` as the fundamental operation.
-weakenUnderV : ∀ {n} {i : Fin (suc n)} (x : Fin n) → Dec (i ≤ x) → Fin (suc n)
+weakenUnderV : ∀ {n m} {i : Fin m} (x : Fin n) → Dec (i ≤ x) → Fin (suc n)
 weakenUnderV x (true because _) = suc x
 weakenUnderV x (false because _) = inject₁ x
 
@@ -100,7 +100,7 @@ subst f (e₁ ∙ e₂) = (subst f e₁ ∙ subst f e₂)
 
 plugV : ∀{n} {i : Fin (suc n)} x (t : Term n) → Comparison (suc n) i x → Term n
 plugV x t (eq _) = t
-plugV x t (lt i<x) = V {! predecessor x !}
+plugV x t (lt i<x) = V (pred' x (<⇒≢0 x i<x))
 plugV {n} {i} x t (gt x<i) = V (lower₁ x x≢n)
   where
     x≢n : n ≢ toℕ x
