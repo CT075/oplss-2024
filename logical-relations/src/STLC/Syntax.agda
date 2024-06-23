@@ -1,15 +1,9 @@
 module STLC.Syntax where
 
 open import Data.Nat using (ℕ; suc; zero; _+_; s≤s; z≤n)
-open import Data.Nat.Properties using (+-comm; <⇒≢; <-≤-trans)
-open import Data.Nat.Util
-open import Data.Bool using (true; false)
+open import Data.Nat.Properties using (+-comm)
 open import Data.Fin hiding (_+_)
-open import Data.Fin.Properties using (toℕ<n; toℕ-mono-<)
-open import Data.Fin.Util
-open import Data.Product using (_,_)
-open import Relation.Binary.Definitions as B
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; ≢-sym)
+open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary.Decidable hiding (True; False)
 open import Function
 
@@ -48,14 +42,8 @@ _~&_ c Γ (suc n) = Γ(n)
 drop : ∀{T n} → Context T (suc n) → Context T n
 drop γ = γ ∘ suc
 
--- This is `if x < i then x else suc x`. We flip the condition to i ≤ x because
--- Data.Nat uses `i ≤ x` as the fundamental operation.
-weakenUnderV : ∀ {n m} {i : Fin m} (x : Fin n) → Dec (i ≤ x) → Fin (suc n)
-weakenUnderV x (true because _) = suc x
-weakenUnderV x (false because _) = inject₁ x
-
 weakenUnder : ∀{n} → Fin (suc n) → Term n → Term (suc n)
-weakenUnder {n} i (V x) = V (weakenUnderV x (i ≤? x))
+weakenUnder {n} i (V x) = V (punchIn i x)
 weakenUnder i True = True
 weakenUnder i False = False
 weakenUnder i (if e then e₁ else e₂) =
@@ -98,16 +86,12 @@ subst f (prj₂ e) = prj₂ (subst f e)
 subst f (ƛ τ e) = ƛ τ (subst (weakenSubst f) e)
 subst f (e₁ ∙ e₂) = (subst f e₁ ∙ subst f e₂)
 
-plugV : ∀{n} {i : Fin (suc n)} x (t : Term n) → Comparison (suc n) i x → Term n
-plugV x t (eq _) = t
-plugV x t (lt i<x) = V (pred' x (<⇒≢0 x i<x))
-plugV {n} {i} x t (gt x<i) = V (lower₁ x x≢n)
-  where
-    x≢n : n ≢ toℕ x
-    x≢n = ≢-sym (<⇒≢ (<-≤-trans x<i (<s⇒≤ (toℕ<n i))))
+plugV : ∀{n} (i : Fin (suc n)) (t : Term n) x → Dec (i ≡ x) → Term n
+plugV i t x (yes i≡x) = t
+plugV i t x (no i≢x) = V (punchOut i≢x)
 
 plugVar : ∀{n} → (i : Fin (suc n)) → Term n → (x : Fin (suc n)) → Term n
-plugVar {n} i t x = plugV x t (compareW i x)
+plugVar {n} i t x = plugV i t x (i ≟ x)
 
 plugi : ∀{n} → Fin (suc n) → Term n → Term (suc n) → Term n
 plugi {n} i t = subst (plugVar i t)
